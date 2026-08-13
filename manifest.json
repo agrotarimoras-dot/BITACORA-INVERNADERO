@@ -1,0 +1,19 @@
+{
+  "name": "Invernadero",
+  "short_name": "Invernadero",
+  "description": "Bitácora offline para el manejo de un invernadero de fresas: tareas, mapeo, inventario, balance y más.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF6EE",
+  "theme_color": "#2F4A2B",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

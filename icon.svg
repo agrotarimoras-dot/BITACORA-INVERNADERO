@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2F4A2B"/>
+      <stop offset="100%" stop-color="#1E3220"/>
+    </linearGradient>
+    <linearGradient id="berry" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E63950"/>
+      <stop offset="100%" stop-color="#A81F3A"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7FA35C"/>
+      <stop offset="100%" stop-color="#4C7A3D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- fondo -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- hojas -->
+  <g>
+    <path d="M256 150 C220 110 160 108 150 150 C185 155 215 165 256 195 Z" fill="url(#leaf)"/>
+    <path d="M256 150 C292 110 352 108 362 150 C327 155 297 165 256 195 Z" fill="url(#leaf)"/>
+    <path d="M256 140 C240 100 210 90 190 108 C215 122 235 130 256 160 Z" fill="url(#leaf)"/>
+    <path d="M256 140 C272 100 302 90 322 108 C297 122 277 130 256 160 Z" fill="url(#leaf)"/>
+    <path d="M256 130 C250 100 240 88 232 92 C240 105 246 115 256 138 Z" fill="url(#leaf)"/>
+    <path d="M256 130 C262 100 272 88 280 92 C272 105 266 115 256 138 Z" fill="url(#leaf)"/>
+  </g>
+
+  <!-- cuerpo de la fresa -->
+  <path d="M256 178
+           C 340 178 392 232 392 300
+           C 392 372 330 430 256 430
+           C 182 430 120 372 120 300
+           C 120 232 172 178 256 178 Z"
+        fill="url(#berry)"/>
+
+  <!-- semillas -->
+  <g fill="#FCE9AE">
+    <ellipse cx="205" cy="255" rx="6" ry="9" transform="rotate(-20 205 255)"/>
+    <ellipse cx="255" cy="235" rx="6" ry="9" transform="rotate(0 255 235)"/>
+    <ellipse cx="308" cy="255" rx="6" ry="9" transform="rotate(20 308 255)"/>
+    <ellipse cx="178" cy="305" rx="6" ry="9" transform="rotate(-25 178 305)"/>
+    <ellipse cx="232" cy="295" rx="6" ry="9" transform="rotate(-5 232 295)"/>
+    <ellipse cx="284" cy="295" rx="6" ry="9" transform="rotate(5 284 295)"/>
+    <ellipse cx="335" cy="305" rx="6" ry="9" transform="rotate(25 335 305)"/>
+    <ellipse cx="205" cy="355" rx="6" ry="9" transform="rotate(-20 205 355)"/>
+    <ellipse cx="256" cy="368" rx="6" ry="9" transform="rotate(0 256 368)"/>
+    <ellipse cx="307" cy="355" rx="6" ry="9" transform="rotate(20 307 355)"/>
+    <ellipse cx="255" cy="330" rx="6" ry="9" transform="rotate(0 255 330)"/>
+  </g>
+
+  <!-- brillo -->
+  <path d="M175 240 C185 225 205 218 220 220 C195 232 182 250 178 275 C170 265 168 250 175 240 Z" fill="#ffffff" opacity="0.25"/>
+</svg>
