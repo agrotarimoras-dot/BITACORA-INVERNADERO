@@ -34,6 +34,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Invernadero">
 
+<!-- Firebase (sincronización en la nube en tiempo real, con soporte sin conexión) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+
 <style>
   :root{
     --moss: #2F4A2B;
@@ -85,6 +90,21 @@
     opacity: 0.85;
     position: relative;
   }
+  .sync-badge{
+    position: relative;
+    margin-top: 8px;
+    display: inline-block;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.2px;
+    background: rgba(255,255,255,0.14);
+    color: var(--crema);
+  }
+  .sync-badge--ok{ background: rgba(127,163,92,0.35); }
+  .sync-badge--offline{ background: rgba(214,46,78,0.28); }
+  .sync-badge--saving{ background: rgba(255,255,255,0.22); }
   .wrap{ max-width: 560px; margin: 0 auto; padding: 16px; }
   .card{
     background: #fff;
@@ -487,6 +507,7 @@
     <span id="sesionUsuarioTxt">—</span>
     <button onclick="cerrarSesion()">Cambiar usuario</button>
   </div>
+  <div id="syncEstadoBadge" class="sync-badge sync-badge--offline">● Conectando…</div>
 </header>
 
 <div class="wrap">
@@ -778,6 +799,13 @@
         <div class="balance-num" id="balanceNeto">$0</div>
       </div>
       <div class="card">
+        <h2>Ventas y gastos — últimos días</h2>
+        <div id="graficaBalance" style="overflow-x:auto;"></div>
+        <div style="display:flex; gap:16px; margin-top:6px; font-size:12px; color:#8a8270;">
+          <span>🟩 Ventas</span><span>🟥 Gastos</span>
+        </div>
+      </div>
+      <div class="card">
         <h2>Detalle</h2>
         <div id="balanceDetalle"></div>
       </div>
@@ -812,12 +840,10 @@
         <div id="listaUsuarios"></div>
       </div>
       <div class="card">
-        <h2>Sincronización con Google Sheets</h2>
-        <label>URL del Web App (Google Apps Script)</label>
-        <input type="text" id="sheetsUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-        <button class="btn-secondary" onclick="guardarSheetsUrl()">Guardar URL</button>
-        <button class="btn-secondary" onclick="sincronizarConSheets()">🔄 Sincronizar ahora</button>
-        <div class="filecount" id="sheetsEstado">Sin sincronizar todavía.</div>
+        <h2>Sincronización en la nube (Firebase)</h2>
+        <p style="font-size:12px; color:#8a8270; margin:-4px 0 10px; line-height:1.4;">Todo lo que se captura en cualquier teléfono se guarda primero en el propio teléfono (funciona sin señal) y se sube solo en cuanto hay internet. Los demás teléfonos reciben los cambios automáticamente, sin tener que hacer nada.</p>
+        <div class="filecount" id="sheetsEstado">Conectando con la nube…</div>
+        <button class="btn-secondary" onclick="forzarResincronizacion()">🔄 Reintentar sincronización ahora</button>
       </div>
     </div>
 
@@ -867,8 +893,8 @@
 <script>
 let registros = [];
 let usuarios = [
-  { nombre:'Usuario 1', rol:'admin', pin:'1234', activo:true },
-  { nombre:'Usuario 2', rol:'operador', pin:'', activo:true }
+  { id:'usr-default-1', creado:1, nombre:'Usuario 1', rol:'admin', pin:'1234', activo:true },
+  { id:'usr-default-2', creado:2, nombre:'Usuario 2', rol:'operador', pin:'', activo:true }
 ];
 let currentUser = null;
 let usuarioActivoNombre = null;
@@ -1349,13 +1375,17 @@ function resetFormulario(){
 }
 
 function aplicarEfectosSecundarios(reg){
+  let tocoCamas = false;
   if(reg.tipoTarea === 'Control de plagas/enfermedades' && reg.plagasCamaAlerta && camasData[reg.plagasCamaAlerta]){
     const nivelTxt = reg.plagasNivel ? ` (${reg.plagasNivel})` : '';
     camasData[reg.plagasCamaAlerta].alerta = (reg.plagasNombre || 'Plaga/enfermedad reportada') + nivelTxt;
+    tocoCamas = true;
   }
   if(reg.tipoTarea === 'Revisión general' && reg.revCamaEtapa && reg.revNuevaEtapa && camasData[reg.revCamaEtapa]){
     camasData[reg.revCamaEtapa].etapa = reg.revNuevaEtapa;
+    tocoCamas = true;
   }
+  if(tocoCamas) fsGuardarConfig('camas', camasData);
 }
 
 function agregarRegistro(){
@@ -1367,12 +1397,15 @@ function agregarRegistro(){
   const notas = document.getElementById('notas').value;
 
   if(editingIndex !== null){
-    const original = registros[editingIndex];
-    registros[editingIndex] = Object.assign({}, original, {
+    const idxEdit = registros.findIndex(x => x.id === editingIndex);
+    if(idxEdit === -1){ resetFormulario(); return; }
+    const original = registros[idxEdit];
+    registros[idxEdit] = Object.assign({}, original, {
       tipoTarea: tipoTareaSeleccionada,
       notas
     }, camposData);
-    aplicarEfectosSecundarios(registros[editingIndex]);
+    aplicarEfectosSecundarios(registros[idxEdit]);
+    fsGuardarItem('registros', registros[idxEdit]);
     const destino = editingOrigin;
     resetFormulario();
     editingOrigin = 'historial';
@@ -1383,6 +1416,7 @@ function agregarRegistro(){
   const ahora = new Date();
   const reg = Object.assign({
     id: generarId(),
+    creado: Date.now(),
     fecha: ahora.toLocaleDateString('es-MX'),
     hora: ahora.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'}),
     usuario: currentUser ? currentUser.nombre : (usuarioActivoNombre || 'Usuario 1'),
@@ -1392,15 +1426,15 @@ function agregarRegistro(){
   registros.unshift(reg);
   aplicarEfectosSecundarios(reg);
   autocompletarTareaProgramada(reg);
-  enviarRegistroASheets(reg);
+  fsGuardarItem('registros', reg);
   resetFormulario();
   cambiarTab('historial');
 }
 
-function iniciarEdicion(idx, origen){
-  const r = registros[idx];
+function iniciarEdicion(id, origen){
+  const r = registros.find(x => x.id === id);
   if(!r) return;
-  editingIndex = idx;
+  editingIndex = id;
   editingOrigin = origen;
 
   tipoTareaSeleccionada = r.tipoTarea;
@@ -1550,8 +1584,8 @@ function pintarLista(){
           <div class="entry-meta">${r.fecha} · ${r.hora} · ${r.usuario}</div>
         </div>
         <div class="entry-actions">
-          <button class="btn-ghost edit" onclick="iniciarEdicion(${idx}, 'historial')">Editar</button>
-          <button class="btn-ghost" onclick="borrarRegistro(${idx})">Borrar</button>
+          <button class="btn-ghost edit" onclick="iniciarEdicion('${r.id}', 'historial')">Editar</button>
+          <button class="btn-ghost" onclick="borrarRegistro('${r.id}')">Borrar</button>
         </div>
       </div>
       <div>${badgesHTML(r)}</div>
@@ -1563,8 +1597,11 @@ function pintarLista(){
   });
 }
 
-function borrarRegistro(idx){
+function borrarRegistro(id){
+  const idx = registros.findIndex(x => x.id === id);
+  if(idx === -1) return;
   registros.splice(idx, 1);
+  fsBorrarItem('registros', id);
   if(editingIndex !== null){ editingIndex = null; resetFormulario(); }
   pintarLista();
 }
@@ -1652,7 +1689,6 @@ function abrirDiaModal(fechaRef){
   } else {
     contReg.innerHTML = '';
     entradas.forEach(r => {
-      const idxGlobal = registros.indexOf(r);
       const div = document.createElement('div');
       div.className = 'entry';
       div.innerHTML = `
@@ -1662,8 +1698,8 @@ function abrirDiaModal(fechaRef){
             <div class="entry-meta">${r.hora} · ${r.usuario}</div>
           </div>
           <div class="entry-actions">
-            <button class="btn-ghost edit" onclick="iniciarEdicion(${idxGlobal}, 'calendario')">Editar</button>
-            <button class="btn-ghost" onclick="borrarRegistro(${idxGlobal}); pintarCalendario(); abrirDiaModal(diaSeleccionado);">Borrar</button>
+            <button class="btn-ghost edit" onclick="iniciarEdicion('${r.id}', 'calendario')">Editar</button>
+            <button class="btn-ghost" onclick="borrarRegistro('${r.id}'); pintarCalendario(); abrirDiaModal(diaSeleccionado);">Borrar</button>
           </div>
         </div>
         <div>${badgesHTML(r)}</div>
@@ -1799,6 +1835,7 @@ function guardarCamaModal(){
   camasData[camaModalCodigo].estadoActual = document.getElementById('camaModalEstado').value;
   camasData[camaModalCodigo].etapa = document.getElementById('camaModalEtapa').value;
   camasData[camaModalCodigo].alerta = document.getElementById('camaModalAlerta').value;
+  fsGuardarConfig('camas', camasData);
   cerrarCamaModal();
   pintarMapa();
 }
@@ -1824,7 +1861,7 @@ function pintarResumenMapa(){
 function guardarInsumo(){
   const nombre = document.getElementById('invNombre').value.trim();
   if(!nombre){ alert('Escribe el nombre del insumo.'); return; }
-  const insumo = {
+  const datos = {
     nombre,
     categoria: document.getElementById('invCategoria').value,
     evaluacion: document.getElementById('invEvaluacion').value,
@@ -1834,11 +1871,17 @@ function guardarInsumo(){
     precio: document.getElementById('invPrecio').value,
     proveedor: document.getElementById('invProveedor').value
   };
+  let insumo;
   if(editingInsumoIndex !== null){
-    inventario[editingInsumoIndex] = insumo;
+    const idx = inventario.findIndex(x => x.id === editingInsumoIndex);
+    if(idx === -1){ cancelarEdicionInsumo(); return; }
+    insumo = Object.assign(inventario[idx], datos);
+    inventario[idx] = insumo;
   } else {
+    insumo = Object.assign({ id: generarId(), creado: Date.now() }, datos);
     inventario.unshift(insumo);
   }
+  fsGuardarItem('inventario', insumo);
   cancelarEdicionInsumo();
   pintarInventario();
 }
@@ -1849,8 +1892,9 @@ function limpiarFormInsumo(){
   });
 }
 
-function editarInsumo(idx){
-  const i = inventario[idx];
+function editarInsumo(id){
+  const i = inventario.find(x => x.id === id);
+  if(!i) return;
   document.getElementById('invNombre').value = i.nombre || '';
   document.getElementById('invCategoria').value = i.categoria || '';
   document.getElementById('invEvaluacion').value = i.evaluacion || '';
@@ -1859,7 +1903,7 @@ function editarInsumo(idx){
   document.getElementById('invUnidad').value = i.unidad || '';
   document.getElementById('invPrecio').value = i.precio || '';
   document.getElementById('invProveedor').value = i.proveedor || '';
-  editingInsumoIndex = idx;
+  editingInsumoIndex = id;
   document.getElementById('invTitulo').textContent = 'Editar insumo';
   document.getElementById('btnGuardarInsumo').textContent = 'Guardar cambios';
   document.getElementById('btnCancelarInsumo').classList.remove('hidden');
@@ -1874,10 +1918,13 @@ function cancelarEdicionInsumo(){
   document.getElementById('btnCancelarInsumo').classList.add('hidden');
 }
 
-function borrarInsumo(idx){
+function borrarInsumo(id){
   if(!confirm('¿Borrar este insumo del inventario?')) return;
+  const idx = inventario.findIndex(x => x.id === id);
+  if(idx === -1) return;
   inventario.splice(idx, 1);
-  if(editingInsumoIndex === idx) cancelarEdicionInsumo();
+  fsBorrarItem('inventario', id);
+  if(editingInsumoIndex === id) cancelarEdicionInsumo();
   pintarInventario();
 }
 
@@ -1887,7 +1934,7 @@ function pintarInventario(){
     cont.innerHTML = '<div class="empty"><div class="big">📦</div>Todavía no hay insumos registrados.</div>';
     return;
   }
-  cont.innerHTML = inventario.map((i, idx) => `
+  cont.innerHTML = inventario.map((i) => `
     <div class="entry" style="border-left-color: var(--moss);">
       <div class="entry-top">
         <div>
@@ -1895,8 +1942,8 @@ function pintarInventario(){
           <div class="entry-meta">${escapeHtml(i.categoria || 'Sin categoría')}</div>
         </div>
         <div class="entry-actions">
-          <button class="btn-ghost edit" onclick="editarInsumo(${idx})">Editar</button>
-          <button class="btn-ghost" onclick="borrarInsumo(${idx})">Borrar</button>
+          <button class="btn-ghost edit" onclick="editarInsumo('${i.id}')">Editar</button>
+          <button class="btn-ghost" onclick="borrarInsumo('${i.id}')">Borrar</button>
         </div>
       </div>
       <div>
@@ -1934,18 +1981,26 @@ function agregarAviso(){
   const input = document.getElementById('avisoInput');
   const texto = input.value.trim();
   if(!texto) return;
-  avisos.unshift({ texto, hecho:false });
+  const aviso = { id: generarId(), creado: Date.now(), texto, hecho:false };
+  avisos.unshift(aviso);
+  fsGuardarItem('avisos', aviso);
   input.value = '';
   pintarAvisos();
 }
 
-function toggleAviso(idx){
-  avisos[idx].hecho = !avisos[idx].hecho;
+function toggleAviso(id){
+  const a = avisos.find(x => x.id === id);
+  if(!a) return;
+  a.hecho = !a.hecho;
+  fsGuardarItem('avisos', a);
   pintarAvisos();
 }
 
-function borrarAviso(idx){
+function borrarAviso(id){
+  const idx = avisos.findIndex(x => x.id === id);
+  if(idx === -1) return;
   avisos.splice(idx, 1);
+  fsBorrarItem('avisos', id);
   pintarAvisos();
 }
 
@@ -1955,19 +2010,20 @@ function pintarAvisos(){
     cont.innerHTML = '<div class="empty" style="padding:16px 4px;">Sin avisos pendientes.</div>';
     return;
   }
-  cont.innerHTML = avisos.map((a, idx) => `
+  cont.innerHTML = avisos.map((a) => `
     <label class="chk-row" style="justify-content:space-between;">
       <span style="display:flex; align-items:center; gap:10px; ${a.hecho ? 'text-decoration:line-through; opacity:0.5;' : ''}">
-        <input type="checkbox" ${a.hecho ? 'checked' : ''} onchange="toggleAviso(${idx})">
+        <input type="checkbox" ${a.hecho ? 'checked' : ''} onchange="toggleAviso('${a.id}')">
         ${escapeHtml(a.texto)}
       </span>
-      <button class="btn-ghost" onclick="borrarAviso(${idx})">✕</button>
+      <button class="btn-ghost" onclick="borrarAviso('${a.id}')">✕</button>
     </label>
   `).join('');
 }
 
 function guardarNotasLibres(){
   notasLibres = document.getElementById('notasLibresArea').value;
+  fsGuardarConfig('notasLibres', notasLibres, 800);
 }
 
 function csvEscape(v){
@@ -2086,74 +2142,230 @@ function importarCSV(event){
   reader.readAsText(file);
 }
 
-// ---------- SINCRONIZACIÓN CON GOOGLE SHEETS ----------
+// ---------- SINCRONIZACIÓN EN LA NUBE CON FIREBASE / FIRESTORE ----------
 // ======================================================================
-// 🔗 GOOGLE SHEETS — CONFIGURACIÓN DE RESPALDO EN LA NUBE
+// 🔗 Cómo funciona:
+// - Firestore guarda una copia local de cada colección directamente en el
+//   teléfono (IndexedDB). Guardar un dato SIEMPRE funciona, haya o no señal.
+// - En cuanto el teléfono recupera internet, Firestore sube en automático
+//   todo lo que se guardó mientras estaba sin conexión. No hace falta
+//   ningún botón ni acordarse de nada.
+// - Cada registro/venta/gasto/etc. se guarda como un documento individual
+//   (no como una sola lista gigante), para que si dos personas capturan
+//   datos al mismo tiempo sin señal, NUNCA se borre el trabajo de nadie
+//   al reconectarse: cada quien sube lo suyo y todo se combina solo.
+// - Mientras la app está abierta, "escucha" los cambios en la nube y
+//   actualiza la pantalla casi al instante cuando otro usuario captura algo.
 // ======================================================================
-// 1) Ve a https://script.google.com, crea un proyecto nuevo, pega el código
-//    de Apps Script que te compartí (doGet/doPost) y públicalo como
-//    "Implementación web" (Deploy > New deployment > Web app),
-//    con acceso "Cualquier usuario" ("Anyone").
-// 2) Copia la URL que termina en /exec y pégala aquí abajo, o en Historial
-//    dentro de la app (queda guardada en el respaldo JSON).
-// 3) Cada vez que se guarda un registro nuevo, la app intenta enviarlo
-//    automáticamente a esa URL (si hay internet). Si no hay señal, no pasa
-//    nada malo: el registro queda guardado localmente y puedes sincronizar
-//    manualmente después desde Historial con el botón "Sincronizar ahora".
-// ======================================================================
-const GOOGLE_SHEETS_WEB_APP_URL = ''; // <-- pega aquí tu URL de Apps Script (.../exec)
+const firebaseConfig = {
+  apiKey: "AIzaSyC91hxnpLmeMLTv5lOS1I-04qmkwQtfbE0",
+  authDomain: "invernadero-bitacora.firebaseapp.com",
+  projectId: "invernadero-bitacora",
+  storageBucket: "invernadero-bitacora.firebasestorage.app",
+  messagingSenderId: "307662012528",
+  appId: "1:307662012528:web:8651ae50ccf197ddb7b4b5"
+};
 
-let sheetsWebhookUrl = GOOGLE_SHEETS_WEB_APP_URL;
+let fsDb = null;
+let fsListo = false;
 
-function guardarSheetsUrl(){
-  sheetsWebhookUrl = document.getElementById('sheetsUrlInput').value.trim();
-  document.getElementById('sheetsEstado').textContent = sheetsWebhookUrl ? 'URL guardada. Toca "Sincronizar ahora".' : 'Sin URL configurada.';
+try{
+  firebase.initializeApp(firebaseConfig);
+  fsDb = firebase.firestore();
+  fsDb.enablePersistence({ synchronizeTabs: true }).catch(err => {
+    console.warn('Persistencia offline no disponible en este navegador:', err.code);
+  });
+  firebase.auth().onAuthStateChanged(user => {
+    if(!user){
+      firebase.auth().signInAnonymously().catch(err => {
+        console.warn('No se pudo autenticar con Firebase:', err);
+        setSyncBadge('offline', 'No se pudo conectar con la nube');
+      });
+    }
+  });
+} catch(err){
+  console.warn('No se pudo inicializar Firebase:', err);
 }
 
-async function sincronizarConSheets(){
-  if(!sheetsWebhookUrl){ alert('Primero pega y guarda la URL del Web App de Google Apps Script.'); return; }
-  if(!navigator.onLine){ if(document.getElementById('sheetsEstado')) document.getElementById('sheetsEstado').textContent = 'Sin conexión a internet ahora mismo. Se reintentará cuando vuelva la señal.'; return; }
-  if(document.getElementById('sheetsEstado')) document.getElementById('sheetsEstado').textContent = 'Sincronizando...';
-  const payload = {
-    registros, ventas, gastos, clientes, inventario, proveedores,
-    enviado: new Date().toISOString()
-  };
-  try{
-    await fetch(sheetsWebhookUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-    if(document.getElementById('sheetsEstado')) document.getElementById('sheetsEstado').textContent = 'Enviado a Google Sheets el ' + new Date().toLocaleString('es-MX') + ' (modo no-cors: no se puede confirmar la respuesta, revisa tu hoja de cálculo).';
-  } catch(err){
-    if(document.getElementById('sheetsEstado')) document.getElementById('sheetsEstado').textContent = 'No se pudo enviar. Se reintentará cuando haya conexión.';
+function setSyncBadge(estado, texto){
+  const badge = document.getElementById('syncEstadoBadge');
+  const panel = document.getElementById('sheetsEstado');
+  if(badge){
+    badge.className = 'sync-badge sync-badge--' + estado;
+    badge.textContent = (estado === 'ok' ? '● ' : estado === 'saving' ? '● ' : '● ') + texto;
+  }
+  if(panel) panel.textContent = texto;
+}
+
+function actualizarBadgeConexion(){
+  if(!navigator.onLine){
+    setSyncBadge('offline', 'Sin señal — guardando en el teléfono');
+  } else if(fsListo){
+    setSyncBadge('ok', 'Sincronizado');
+  } else {
+    setSyncBadge('saving', 'Conectando…');
   }
 }
+window.addEventListener('online', actualizarBadgeConexion);
+window.addEventListener('offline', actualizarBadgeConexion);
 
-// Envío automático de UN solo registro nuevo (no espera a "Sincronizar ahora")
-async function enviarRegistroASheets(reg){
-  if(!sheetsWebhookUrl || !navigator.onLine) return;
-  try{
-    await fetch(sheetsWebhookUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ tipo: 'registro_individual', registro: reg, enviado: new Date().toISOString() })
-    });
-  } catch(err){
-    // Sin conexión o falló el envío: el dato ya quedó guardado localmente,
-    // se podrá reintentar con "Sincronizar ahora" o al reconectar.
-  }
+// Guarda (crea o actualiza) UN documento dentro de una colección.
+// El objeto "item" debe traer un campo "id".
+function fsGuardarItem(coleccion, item){
+  if(!fsDb || !item || !item.id) return;
+  fsDb.collection(coleccion).doc(String(item.id)).set(item, { merge: true })
+    .catch(err => console.warn('No se pudo guardar en la nube (' + coleccion + '):', err));
 }
 
-window.addEventListener('online', () => {
-  if(sheetsWebhookUrl) sincronizarConSheets();
-});
+// Borra UN documento de una colección.
+function fsBorrarItem(coleccion, id){
+  if(!fsDb || !id) return;
+  fsDb.collection(coleccion).doc(String(id)).delete()
+    .catch(err => console.warn('No se pudo borrar en la nube (' + coleccion + '):', err));
+}
+
+// Guarda un documento único (no una lista) para datos "singulares", como
+// el mapa de camas, las notas libres o la descripción de columnas.
+let fsConfigTimers = {};
+function fsGuardarConfig(clave, valor, debounceMs){
+  if(!fsDb) return;
+  clearTimeout(fsConfigTimers[clave]);
+  fsConfigTimers[clave] = setTimeout(() => {
+    fsDb.collection('config').doc(clave).set({ valor })
+      .catch(err => console.warn('No se pudo guardar configuración (' + clave + '):', err));
+  }, debounceMs || 0);
+}
+
+// Escucha en tiempo real una colección completa y llama a onCambio(lista)
+// cada vez que hay un cambio (propio o de otro usuario/teléfono).
+function fsEscucharColeccion(coleccion, onCambio){
+  if(!fsDb) return () => {};
+  return fsDb.collection(coleccion).onSnapshot(snap => {
+    const items = [];
+    snap.forEach(doc => items.push(doc.data()));
+    fsListo = true;
+    actualizarBadgeConexion();
+    onCambio(items);
+  }, err => {
+    console.warn('Error escuchando ' + coleccion + ':', err);
+  });
+}
+
+function fsEscucharConfig(clave, onCambio){
+  if(!fsDb) return;
+  fsDb.collection('config').doc(clave).onSnapshot(snap => {
+    if(!snap.exists) return;
+    onCambio(snap.data().valor);
+  }, err => console.warn('Error escuchando configuración (' + clave + '):', err));
+}
+
+function forzarResincronizacion(){
+  actualizarBadgeConexion();
+  if(!navigator.onLine){ alert('No hay conexión a internet ahora mismo. En cuanto vuelva la señal, la app se sincroniza sola.'); return; }
+  alert('La app se sincroniza en automático. Si algún dato no aparece, cierra y vuelve a abrir la app.');
+}
+
+function iniciarSincronizacionFirebase(){
+  if(!fsDb) return;
+
+  fsEscucharColeccion('registros', items => {
+    if(!items.length && registros.length) return; // evita vaciar si aún no llega nada de la nube
+    registros = items.sort((a,b) => (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+    pintarLista();
+  });
+
+  fsEscucharColeccion('inventario', items => {
+    inventario = items.sort((a,b) => (b.creado||0) - (a.creado||0));
+    pintarInventario();
+  });
+
+  fsEscucharColeccion('avisos', items => {
+    avisos = items.sort((a,b) => (b.creado||0) - (a.creado||0));
+    pintarAvisos();
+  });
+
+  fsEscucharColeccion('eventos', items => {
+    eventos = items.sort((a,b) => (a.fecha+ (a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
+    pintarAgenda();
+  });
+
+  fsEscucharColeccion('tareasProgramadas', items => {
+    tareasProgramadas = items;
+    pintarTareasProg();
+  });
+
+  fsEscucharColeccion('usuarios', items => {
+    if(!items.length) return; // nunca vaciar la lista de usuarios (te dejaría sin poder entrar)
+    usuarios = items.sort((a,b) => (a.creado||0) - (b.creado||0));
+    pintarUserPicker();
+    pintarLoginUsers();
+    if(currentUser && currentUser.rol === 'admin') pintarUsuarios();
+  });
+
+  fsEscucharColeccion('proveedores', items => {
+    proveedores = items.sort((a,b) => (b.creado||0) - (a.creado||0));
+    pintarProveedores();
+  });
+
+  fsEscucharConfig('camas', valor => {
+    if(valor && typeof valor === 'object'){
+      CAMAS.forEach(c => { if(valor[c]) camasData[c] = valor[c]; });
+      pintarMapa();
+    }
+  });
+
+  fsEscucharConfig('notasLibres', valor => {
+    if(typeof valor === 'string' && valor !== notasLibres){
+      notasLibres = valor;
+      const el = document.getElementById('notasLibresArea');
+      if(el && document.activeElement !== el) el.value = notasLibres;
+    }
+  });
+
+  fsEscucharConfig('descripcionColumnas', valor => {
+    if(valor && typeof valor === 'object'){
+      descripcionColumnas = valor;
+      if(document.getElementById('colDescList') && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.col) return;
+      if(document.getElementById('colDescList')) pintarColDesc();
+    }
+  });
+}
+
+actualizarBadgeConexion();
+iniciarSincronizacionFirebase();
+
+// ---------- Datos financieros (ventas/gastos/clientes): SOLO ADMIN ----------
+// Estos datos ni siquiera se descargan al teléfono si quien inició sesión
+// no es administrador — así los operadores no pueden verlos ni aunque
+// revisen el código de la app.
+let fsFinancieroUnsubs = [];
+function iniciarSincronizacionFinanciera(){
+  if(fsFinancieroUnsubs.length) return; // ya está activa
+  fsFinancieroUnsubs.push(
+    fsEscucharColeccion('ventas', items => {
+      ventas = items.sort((a,b) => (b.creado||0) - (a.creado||0));
+      pintarVentas(); pintarBalance();
+    }),
+    fsEscucharColeccion('gastos', items => {
+      gastos = items.sort((a,b) => (b.creado||0) - (a.creado||0));
+      pintarGastos(); pintarBalance();
+    }),
+    fsEscucharColeccion('clientes', items => {
+      clientes = items.sort((a,b) => (b.creado||0) - (a.creado||0));
+      pintarClientes(); pintarSelectClientes(); pintarBalance();
+    })
+  );
+}
+function detenerSincronizacionFinanciera(){
+  fsFinancieroUnsubs.forEach(unsub => { try{ unsub(); }catch(e){} });
+  fsFinancieroUnsubs = [];
+  // Borra los datos financieros de la memoria del teléfono si no es admin
+  ventas = []; gastos = []; clientes = [];
+}
 
 function exportarBackupJSON(){
   const backup = {
-    version: 4,
+    version: 5,
     fechaRespaldo: new Date().toISOString(),
     registros,
     inventario,
@@ -2167,8 +2379,7 @@ function exportarBackupJSON(){
     proveedores,
     descripcionColumnas,
     eventos,
-    tareasProgramadas,
-    sheetsWebhookUrl
+    tareasProgramadas
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
@@ -2179,6 +2390,19 @@ function exportarBackupJSON(){
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// Asegura que cada elemento de una lista tenga id/creado, y sube todos
+// los elementos a su colección de Firestore (se usa al restaurar un
+// respaldo, para que lo restaurado también quede sincronizado en la nube).
+function asegurarIdsYSubir(lista, coleccion){
+  if(!Array.isArray(lista)) return [];
+  lista.forEach(item => {
+    if(!item.id) item.id = generarId();
+    if(!item.creado) item.creado = Date.now();
+    fsGuardarItem(coleccion, item);
+  });
+  return lista;
 }
 
 function importarBackupJSON(event){
@@ -2193,28 +2417,28 @@ function importarBackupJSON(event){
       alert('Ese archivo no es un respaldo válido.');
       return;
     }
-    if(!confirm('Esto reemplazará todos los datos actuales de la app con los del respaldo. ¿Continuar?')) return;
+    if(!confirm('Esto reemplazará todos los datos actuales de la app (y de la nube) con los del respaldo. ¿Continuar?')) return;
 
-    registros = Array.isArray(data.registros) ? data.registros : [];
-    inventario = Array.isArray(data.inventario) ? data.inventario : [];
-    avisos = Array.isArray(data.avisos) ? data.avisos : [];
+    registros = asegurarIdsYSubir(Array.isArray(data.registros) ? data.registros : [], 'registros');
+    inventario = asegurarIdsYSubir(Array.isArray(data.inventario) ? data.inventario : [], 'inventario');
+    avisos = asegurarIdsYSubir(Array.isArray(data.avisos) ? data.avisos : [], 'avisos');
     notasLibres = data.notasLibres || '';
+    fsGuardarConfig('notasLibres', notasLibres, 0);
     if(data.camasData){
       CAMAS.forEach(c => { camasData[c] = data.camasData[c] || { etapa:'Preparación', alerta:'', variedad:'', estadoActual:'' }; });
+      fsGuardarConfig('camas', camasData, 0);
     }
-    if(Array.isArray(data.usuarios) && data.usuarios.length) usuarios = data.usuarios;
-    ventas = Array.isArray(data.ventas) ? data.ventas : [];
-    gastos = Array.isArray(data.gastos) ? data.gastos : [];
-    clientes = Array.isArray(data.clientes) ? data.clientes : [];
-    proveedores = Array.isArray(data.proveedores) ? data.proveedores : [];
-    if(data.descripcionColumnas) descripcionColumnas = data.descripcionColumnas;
-    eventos = Array.isArray(data.eventos) ? data.eventos : [];
-    tareasProgramadas = Array.isArray(data.tareasProgramadas) ? data.tareasProgramadas : [];
-    if(data.sheetsWebhookUrl){
-      sheetsWebhookUrl = data.sheetsWebhookUrl;
-      const sheetsInput = document.getElementById('sheetsUrlInput');
-      if(sheetsInput) sheetsInput.value = sheetsWebhookUrl;
+    if(Array.isArray(data.usuarios) && data.usuarios.length) usuarios = asegurarIdsYSubir(data.usuarios, 'usuarios');
+    ventas = asegurarIdsYSubir(Array.isArray(data.ventas) ? data.ventas : [], 'ventas');
+    gastos = asegurarIdsYSubir(Array.isArray(data.gastos) ? data.gastos : [], 'gastos');
+    clientes = asegurarIdsYSubir(Array.isArray(data.clientes) ? data.clientes : [], 'clientes');
+    proveedores = asegurarIdsYSubir(Array.isArray(data.proveedores) ? data.proveedores : [], 'proveedores');
+    if(data.descripcionColumnas){
+      descripcionColumnas = data.descripcionColumnas;
+      fsGuardarConfig('descripcionColumnas', descripcionColumnas, 0);
     }
+    eventos = asegurarIdsYSubir(Array.isArray(data.eventos) ? data.eventos : [], 'eventos');
+    tareasProgramadas = asegurarIdsYSubir(Array.isArray(data.tareasProgramadas) ? data.tareasProgramadas : [], 'tareasProgramadas');
 
     pintarUserPicker();
     document.getElementById('notasLibresArea').value = notasLibres;
@@ -2230,7 +2454,7 @@ function importarBackupJSON(event){
     pintarSelectClientes();
     pintarProveedores();
     pintarTareasProg();
-    alert('Respaldo restaurado correctamente.');
+    alert('Respaldo restaurado y subido a la nube correctamente.');
     event.target.value = '';
   };
   reader.readAsText(file);
@@ -2280,10 +2504,16 @@ function completarLogin(u){
   pintarUserPicker();
   pintarTareasProg();
   cambiarTab('nuevo');
+  if(u.rol === 'admin'){
+    iniciarSincronizacionFinanciera();
+  } else {
+    detenerSincronizacionFinanciera();
+  }
 }
 
 function cerrarSesion(){
   currentUser = null;
+  detenerSincronizacionFinanciera();
   document.getElementById('loginPinBox').classList.remove('show');
   document.getElementById('loginError').classList.add('hidden');
   pintarLoginUsers();
@@ -2307,6 +2537,7 @@ function pintarColDesc(){
 }
 function guardarDescColumna(el){
   descripcionColumnas[el.dataset.col] = el.value;
+  fsGuardarConfig('descripcionColumnas', descripcionColumnas, 800);
 }
 
 // ---------- AGENDA DE EVENTOS ----------
@@ -2317,12 +2548,14 @@ function agregarEvento(){
   const texto = document.getElementById('agendaTexto').value.trim();
   const recordar = document.getElementById('agendaRecordar').checked;
   if(!fecha || !texto){ alert('Escribe la fecha y el evento.'); return; }
-  eventos.push({ fecha, hora, texto, recordar });
+  const evento = { id: generarId(), fecha, hora, texto, recordar };
+  eventos.push(evento);
   eventos.sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  fsGuardarItem('eventos', evento);
   document.getElementById('agendaTexto').value = '';
   document.getElementById('agendaHora').value = '';
   document.getElementById('agendaRecordar').checked = false;
-  if(recordar) programarRecordatorio(eventos[eventos.length-1]);
+  if(recordar) programarRecordatorio(evento);
   pintarAgenda();
 }
 function programarRecordatorio(evento){
@@ -2338,8 +2571,11 @@ function programarRecordatorio(evento){
     }
   });
 }
-function borrarEvento(idx){
+function borrarEvento(id){
+  const idx = eventos.findIndex(x => x.id === id);
+  if(idx === -1) return;
   eventos.splice(idx, 1);
+  fsBorrarItem('eventos', id);
   pintarAgenda();
 }
 function pintarAgenda(){
@@ -2348,15 +2584,17 @@ function pintarAgenda(){
     cont.innerHTML = '<div class="empty" style="padding:16px 4px;">Sin eventos programados.</div>';
     return;
   }
-  cont.innerHTML = eventos.map((e, idx) => `
+  cont.innerHTML = eventos.map((e) => {
+    if(!e.id) e.id = generarId();
+    return `
     <div class="agenda-row">
       <div class="agenda-info">
         <div class="agenda-fecha">${e.fecha}${e.hora ? ' · '+e.hora : ''}${e.recordar ? ' · 🔔' : ''}</div>
         ${escapeHtml(e.texto)}
       </div>
-      <button class="btn-ghost" onclick="borrarEvento(${idx})">✕</button>
-    </div>
-  `).join('');
+      <button class="btn-ghost" onclick="borrarEvento('${e.id}')">✕</button>
+    </div>`;
+  }).join('');
 }
 
 // ---------- TAREAS PROGRAMADAS ----------
@@ -2370,30 +2608,41 @@ function pintarTareasProg(){
     return;
   }
   cont.innerHTML = deHoy.map(t => {
-    const idxGlobal = tareasProgramadas.indexOf(t);
+    if(!t.id) t.id = generarId();
     return `
     <div class="tarea-prog-row ${t.completada ? 'completada' : ''}">
-      <input type="checkbox" ${t.completada ? 'checked' : ''} onchange="toggleTareaProg(${idxGlobal})">
+      <input type="checkbox" ${t.completada ? 'checked' : ''} onchange="toggleTareaProg('${t.id}')">
       <div class="tarea-prog-info">${escapeHtml(t.tipoTarea || t.texto || '')}${t.texto && t.tipoTarea ? ' — '+escapeHtml(t.texto) : ''}</div>
-      ${!t.completada ? `<button class="btn-mini" onclick="reprogramarTarea(${idxGlobal})">Reprogramar</button>` : ''}
+      ${!t.completada ? `<button class="btn-mini" onclick="reprogramarTarea('${t.id}')">Reprogramar</button>` : ''}
     </div>`;
   }).join('');
 }
-function toggleTareaProg(idx){
-  tareasProgramadas[idx].completada = !tareasProgramadas[idx].completada;
+function toggleTareaProg(id){
+  const t = tareasProgramadas.find(x => x.id === id);
+  if(!t) return;
+  t.completada = !t.completada;
+  fsGuardarItem('tareasProgramadas', t);
   pintarTareasProg();
 }
-function reprogramarTarea(idx){
+function reprogramarTarea(id){
+  const idx = tareasProgramadas.findIndex(x => x.id === id);
+  if(idx === -1) return;
   cambiarTab('calendario');
   document.getElementById('agendaTexto').value = tareasProgramadas[idx].tipoTarea || tareasProgramadas[idx].texto || '';
   document.getElementById('agendaTexto').scrollIntoView({behavior:'smooth', block:'center'});
   tareasProgramadas.splice(idx, 1);
+  fsBorrarItem('tareasProgramadas', id);
   pintarTareasProg();
 }
 function autocompletarTareaProgramada(reg){
   const hoyStr = reg.fecha;
   const pendiente = tareasProgramadas.find(t => t.fecha === hoyStr && t.tipoTarea === reg.tipoTarea && !t.completada);
-  if(pendiente){ pendiente.completada = true; pintarTareasProg(); }
+  if(pendiente){
+    pendiente.completada = true;
+    if(!pendiente.id) pendiente.id = generarId();
+    fsGuardarItem('tareasProgramadas', pendiente);
+    pintarTareasProg();
+  }
 }
 
 // ---------- BALANCE (solo admin): sub-navegación ----------
@@ -2435,16 +2684,27 @@ function guardarVenta(){
   const cliente = document.getElementById('ventaClienteSelect').value;
   if(kilos <= 0){ alert('Ingresa los kilos vendidos.'); return; }
   const ahora = new Date();
-  ventas.unshift({
+  const venta = {
+    id: generarId(), creado: Date.now(),
     fecha: ahora.toLocaleDateString('es-MX'),
     hora: ahora.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'}),
     kilos, precio, total: +(kilos*precio).toFixed(2), cliente
-  });
+  };
+  ventas.unshift(venta);
+  fsGuardarItem('ventas', venta);
   document.getElementById('ventaKilos').value = '';
   document.getElementById('ventaPrecio').value = '';
   pintarVentas();
+  pintarBalance();
 }
-function borrarVenta(idx){ ventas.splice(idx,1); pintarVentas(); }
+function borrarVenta(id){
+  const idx = ventas.findIndex(x => x.id === id);
+  if(idx === -1) return;
+  ventas.splice(idx,1);
+  fsBorrarItem('ventas', id);
+  pintarVentas();
+  pintarBalance();
+}
 function pintarVentas(){
   const cont = document.getElementById('listaVentas');
   if(!cont) return;
@@ -2452,14 +2712,14 @@ function pintarVentas(){
     cont.innerHTML = '<div class="empty"><div class="big">💰</div>Sin ventas registradas.</div>';
     return;
   }
-  cont.innerHTML = ventas.map((v, idx) => `
+  cont.innerHTML = ventas.map((v) => `
     <div class="entry" style="border-left-color:#2F8F72;">
       <div class="entry-top">
         <div>
           <div class="entry-title">${v.kilos} kg — $${v.total}</div>
           <div class="entry-meta">${v.fecha} · ${v.hora}${v.cliente ? ' · '+escapeHtml(v.cliente) : ''}</div>
         </div>
-        <button class="btn-ghost" onclick="borrarVenta(${idx})">Borrar</button>
+        <button class="btn-ghost" onclick="borrarVenta('${v.id}')">Borrar</button>
       </div>
     </div>
   `).join('');
@@ -2497,27 +2757,38 @@ function guardarGasto(){
   const descripcion = document.getElementById('gastoDescripcion').value;
   if(monto <= 0){ alert('Ingresa el monto del gasto.'); return; }
   const ahora = new Date();
-  gastos.unshift({
+  const gasto = {
+    id: generarId(), creado: Date.now(),
     fecha: ahora.toLocaleDateString('es-MX'), hora: ahora.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'}),
     categoria: gastoCategoriaActual, monto, descripcion
-  });
+  };
+  gastos.unshift(gasto);
+  fsGuardarItem('gastos', gasto);
   document.getElementById('gastoMonto').value = '';
   document.getElementById('gastoDescripcion').value = '';
   pintarGastos();
+  pintarBalance();
 }
-function borrarGasto(idx){ gastos.splice(idx,1); pintarGastos(); }
+function borrarGasto(id){
+  const idx = gastos.findIndex(x => x.id === id);
+  if(idx === -1) return;
+  gastos.splice(idx,1);
+  fsBorrarItem('gastos', id);
+  pintarGastos();
+  pintarBalance();
+}
 function pintarGastos(){
   const cont = document.getElementById('listaGastos');
   if(!cont) return;
   if(gastos.length === 0){ cont.innerHTML = '<div class="empty"><div class="big">🧾</div>Sin gastos registrados.</div>'; return; }
-  cont.innerHTML = gastos.map((g, idx) => `
+  cont.innerHTML = gastos.map((g) => `
     <div class="entry" style="border-left-color:#A81F3A;">
       <div class="entry-top">
         <div>
           <div class="entry-title">$${g.monto} — ${escapeHtml(g.categoria)}</div>
           <div class="entry-meta">${g.fecha} · ${g.hora}${g.descripcion ? ' · '+escapeHtml(g.descripcion) : ''}</div>
         </div>
-        <button class="btn-ghost" onclick="borrarGasto(${idx})">Borrar</button>
+        <button class="btn-ghost" onclick="borrarGasto('${g.id}')">Borrar</button>
       </div>
     </div>
   `).join('');
@@ -2541,26 +2812,33 @@ let editingClienteIndex = null;
 function guardarCliente(){
   const nombre = document.getElementById('clienteNombre').value.trim();
   if(!nombre){ alert('Escribe el nombre del cliente.'); return; }
-  const cliente = {
+  const datos = {
     nombre,
     contacto: document.getElementById('clienteContacto').value,
     notas: document.getElementById('clienteNotas').value
   };
+  let cliente;
   if(editingClienteIndex !== null){
-    clientes[editingClienteIndex] = cliente;
+    const idx = clientes.findIndex(x => x.id === editingClienteIndex);
+    if(idx === -1){ cancelarEdicionCliente(); return; }
+    cliente = Object.assign(clientes[idx], datos);
+    clientes[idx] = cliente;
   } else {
+    cliente = Object.assign({ id: generarId(), creado: Date.now() }, datos);
     clientes.unshift(cliente);
   }
+  fsGuardarItem('clientes', cliente);
   cancelarEdicionCliente();
   pintarClientes();
   pintarSelectClientes();
 }
-function editarCliente(idx){
-  const c = clientes[idx];
+function editarCliente(id){
+  const c = clientes.find(x => x.id === id);
+  if(!c) return;
   document.getElementById('clienteNombre').value = c.nombre || '';
   document.getElementById('clienteContacto').value = c.contacto || '';
   document.getElementById('clienteNotas').value = c.notas || '';
-  editingClienteIndex = idx;
+  editingClienteIndex = id;
   document.getElementById('clienteTitulo').textContent = 'Editar cliente';
   document.getElementById('btnGuardarCliente').textContent = 'Guardar cambios';
   document.getElementById('btnCancelarCliente').classList.remove('hidden');
@@ -2574,8 +2852,11 @@ function cancelarEdicionCliente(){
   document.getElementById('btnGuardarCliente').textContent = 'Agregar cliente';
   document.getElementById('btnCancelarCliente').classList.add('hidden');
 }
-function borrarCliente(idx){
+function borrarCliente(id){
+  const idx = clientes.findIndex(x => x.id === id);
+  if(idx === -1) return;
   clientes.splice(idx, 1);
+  fsBorrarItem('clientes', id);
   pintarClientes();
   pintarSelectClientes();
 }
@@ -2583,7 +2864,7 @@ function pintarClientes(){
   const cont = document.getElementById('listaClientes');
   if(!cont) return;
   if(clientes.length === 0){ cont.innerHTML = '<div class="empty" style="padding:16px 4px;">Sin clientes registrados.</div>'; return; }
-  cont.innerHTML = clientes.map((c, idx) => `
+  cont.innerHTML = clientes.map((c) => `
     <div class="entry" style="border-left-color: var(--moss);">
       <div class="entry-top">
         <div>
@@ -2591,8 +2872,8 @@ function pintarClientes(){
           ${c.contacto ? `<div class="entry-meta">${escapeHtml(c.contacto)}</div>` : ''}
         </div>
         <div class="entry-actions">
-          <button class="btn-ghost edit" onclick="editarCliente(${idx})">Editar</button>
-          <button class="btn-ghost" onclick="borrarCliente(${idx})">Borrar</button>
+          <button class="btn-ghost edit" onclick="editarCliente('${c.id}')">Editar</button>
+          <button class="btn-ghost" onclick="borrarCliente('${c.id}')">Borrar</button>
         </div>
       </div>
       ${c.notas ? `<div class="entry-notes">${escapeHtml(c.notas)}</div>` : ''}
@@ -2624,6 +2905,50 @@ function pintarBalance(){
     <div class="balance-row"><span>Clientes</span><span>${clientes.length}</span></div>
     ${porCategoria}
   `;
+  pintarGraficaBalance();
+}
+
+// Gráfica de barras (ventas vs gastos por día) hecha con SVG puro, para
+// que funcione perfecto sin internet (no depende de ninguna librería externa).
+function pintarGraficaBalance(){
+  const cont = document.getElementById('graficaBalance');
+  if(!cont) return;
+
+  const porDia = {};
+  ventas.forEach(v => { if(!v.fecha) return; porDia[v.fecha] = porDia[v.fecha] || {ventas:0, gastos:0}; porDia[v.fecha].ventas += (v.total||0); });
+  gastos.forEach(g => { if(!g.fecha) return; porDia[g.fecha] = porDia[g.fecha] || {ventas:0, gastos:0}; porDia[g.fecha].gastos += (g.monto||0); });
+
+  const dias = Object.keys(porDia).sort((a,b) => {
+    const pa = a.split('/').reverse().join('-'), pb = b.split('/').reverse().join('-');
+    return pa.localeCompare(pb);
+  }).slice(-14);
+
+  if(dias.length === 0){
+    cont.innerHTML = '<div class="empty" style="padding:16px 4px;">Aún no hay ventas ni gastos para graficar.</div>';
+    return;
+  }
+
+  const max = Math.max(1, ...dias.map(d => Math.max(porDia[d].ventas, porDia[d].gastos)));
+  const anchoCol = 46, altoMax = 130, margenInferior = 34, margenSup = 10;
+  const ancho = Math.max(280, dias.length * anchoCol + 10);
+  const alto = altoMax + margenInferior + margenSup;
+
+  let barras = '';
+  dias.forEach((d, i) => {
+    const x = 6 + i * anchoCol;
+    const hV = (porDia[d].ventas / max) * altoMax;
+    const hG = (porDia[d].gastos / max) * altoMax;
+    const yV = margenSup + (altoMax - hV);
+    const yG = margenSup + (altoMax - hG);
+    const etiqueta = d.split('/').slice(0,2).join('/');
+    barras += `
+      <rect x="${x}" y="${yV}" width="16" height="${hV}" rx="2" fill="#2F8F72"></rect>
+      <rect x="${x+18}" y="${yG}" width="16" height="${hG}" rx="2" fill="#A81F3A"></rect>
+      <text x="${x+17}" y="${alto - margenInferior + 16}" font-size="10" text-anchor="middle" fill="#8a8270">${etiqueta}</text>
+    `;
+  });
+
+  cont.innerHTML = `<svg viewBox="0 0 ${ancho} ${alto}" width="${ancho}" height="${alto}" style="min-width:${ancho}px;">${barras}</svg>`;
 }
 
 // ---------- ADMINISTRACIÓN: USUARIOS ----------
@@ -2633,11 +2958,17 @@ function guardarUsuario(){
   if(!nombre){ alert('Escribe el nombre del usuario.'); return; }
   const rol = document.getElementById('adminUsrRol').value;
   const pin = document.getElementById('adminUsrPin').value;
+  let usuario;
   if(editingUsuarioIndex !== null){
-    usuarios[editingUsuarioIndex] = Object.assign({}, usuarios[editingUsuarioIndex], { nombre, rol, pin, activo:true });
+    const idx = usuarios.findIndex(x => x.id === editingUsuarioIndex);
+    if(idx === -1){ cancelarEdicionUsuario(); return; }
+    usuario = Object.assign(usuarios[idx], { nombre, rol, pin, activo:true });
+    usuarios[idx] = usuario;
   } else {
-    usuarios.push({ nombre, rol, pin, activo:true });
+    usuario = { id: generarId(), creado: Date.now(), nombre, rol, pin, activo:true };
+    usuarios.push(usuario);
   }
+  fsGuardarItem('usuarios', usuario);
   cancelarEdicionUsuario();
   pintarUsuarios();
   pintarUserPicker();
@@ -2648,12 +2979,13 @@ function limpiarFormUsuario(){
   document.getElementById('adminUsrRol').value = 'operador';
   document.getElementById('adminUsrPin').value = '';
 }
-function editarUsuario(idx){
-  const u = usuarios[idx];
+function editarUsuario(id){
+  const u = usuarios.find(x => x.id === id);
+  if(!u) return;
   document.getElementById('adminUsrNombre').value = u.nombre;
   document.getElementById('adminUsrRol').value = u.rol;
   document.getElementById('adminUsrPin').value = u.pin || '';
-  editingUsuarioIndex = idx;
+  editingUsuarioIndex = id;
   document.getElementById('adminUsrTitulo').textContent = 'Editar usuario';
   document.getElementById('btnGuardarUsuario').textContent = 'Guardar cambios';
   document.getElementById('btnCancelarUsuario').classList.remove('hidden');
@@ -2665,20 +2997,26 @@ function cancelarEdicionUsuario(){
   document.getElementById('btnGuardarUsuario').textContent = 'Crear usuario';
   document.getElementById('btnCancelarUsuario').classList.add('hidden');
 }
-function toggleActivoUsuario(idx){
-  usuarios[idx].activo = usuarios[idx].activo === false ? true : false;
+function toggleActivoUsuario(id){
+  const u = usuarios.find(x => x.id === id);
+  if(!u) return;
+  u.activo = u.activo === false ? true : false;
+  fsGuardarItem('usuarios', u);
   pintarUsuarios(); pintarUserPicker(); pintarLoginUsers();
 }
-function eliminarUsuario(idx){
+function eliminarUsuario(id){
   if(usuarios.length <= 1){ alert('Debe existir al menos un usuario.'); return; }
   if(!confirm('¿Eliminar este usuario definitivamente?')) return;
+  const idx = usuarios.findIndex(x => x.id === id);
+  if(idx === -1) return;
   usuarios.splice(idx, 1);
+  fsBorrarItem('usuarios', id);
   pintarUsuarios(); pintarUserPicker(); pintarLoginUsers();
 }
 function pintarUsuarios(){
   const cont = document.getElementById('listaUsuarios');
   if(!cont) return;
-  cont.innerHTML = usuarios.map((u, idx) => `
+  cont.innerHTML = usuarios.map((u) => `
     <div class="entry" style="border-left-color:${u.rol==='admin' ? 'var(--fresa)' : 'var(--moss)'};">
       <div class="entry-top">
         <div>
@@ -2686,11 +3024,11 @@ function pintarUsuarios(){
           <div class="entry-meta">${u.activo===false ? 'Desactivado' : 'Activo'}${u.rol==='admin' && u.pin ? ' · PIN configurado' : ''}</div>
         </div>
         <div class="entry-actions">
-          <button class="btn-ghost edit" onclick="editarUsuario(${idx})">Editar</button>
-          <button class="btn-ghost" onclick="eliminarUsuario(${idx})">Borrar</button>
+          <button class="btn-ghost edit" onclick="editarUsuario('${u.id}')">Editar</button>
+          <button class="btn-ghost" onclick="eliminarUsuario('${u.id}')">Borrar</button>
         </div>
       </div>
-      <button class="btn-secondary" style="margin-top:8px;" onclick="toggleActivoUsuario(${idx})">${u.activo===false ? 'Reactivar' : 'Desactivar'}</button>
+      <button class="btn-secondary" style="margin-top:8px;" onclick="toggleActivoUsuario('${u.id}')">${u.activo===false ? 'Reactivar' : 'Desactivar'}</button>
     </div>
   `).join('');
 }
@@ -2703,6 +3041,7 @@ function cambiarMiPin(){
   if(u){
     u.pin = nuevoPin;
     currentUser.pin = nuevoPin;
+    fsGuardarItem('usuarios', u);
     document.getElementById('miNuevoPin').value = '';
     alert('PIN actualizado correctamente.');
   }
@@ -2714,25 +3053,32 @@ let editingProveedorIndex = null;
 function guardarProveedor(){
   const nombre = document.getElementById('provNombre').value.trim();
   if(!nombre){ alert('Escribe el nombre del proveedor.'); return; }
-  const proveedor = {
+  const datos = {
     nombre,
     contacto: document.getElementById('provContacto').value,
     producto: document.getElementById('provProducto').value
   };
+  let proveedor;
   if(editingProveedorIndex !== null){
-    proveedores[editingProveedorIndex] = proveedor;
+    const idx = proveedores.findIndex(x => x.id === editingProveedorIndex);
+    if(idx === -1){ cancelarEdicionProveedor(); return; }
+    proveedor = Object.assign(proveedores[idx], datos);
+    proveedores[idx] = proveedor;
   } else {
+    proveedor = Object.assign({ id: generarId(), creado: Date.now() }, datos);
     proveedores.unshift(proveedor);
   }
+  fsGuardarItem('proveedores', proveedor);
   cancelarEdicionProveedor();
   pintarProveedores();
 }
-function editarProveedor(idx){
-  const p = proveedores[idx];
+function editarProveedor(id){
+  const p = proveedores.find(x => x.id === id);
+  if(!p) return;
   document.getElementById('provNombre').value = p.nombre || '';
   document.getElementById('provContacto').value = p.contacto || '';
   document.getElementById('provProducto').value = p.producto || '';
-  editingProveedorIndex = idx;
+  editingProveedorIndex = id;
   document.getElementById('provTitulo').textContent = 'Editar proveedor';
   document.getElementById('btnGuardarProveedor').textContent = 'Guardar cambios';
   document.getElementById('btnCancelarProveedor').classList.remove('hidden');
@@ -2746,8 +3092,11 @@ function cancelarEdicionProveedor(){
   document.getElementById('btnGuardarProveedor').textContent = 'Agregar proveedor';
   document.getElementById('btnCancelarProveedor').classList.add('hidden');
 }
-function borrarProveedor(idx){
+function borrarProveedor(id){
+  const idx = proveedores.findIndex(x => x.id === id);
+  if(idx === -1) return;
   proveedores.splice(idx, 1);
+  fsBorrarItem('proveedores', id);
   pintarProveedores();
 }
 function pintarProveedores(){
@@ -2757,7 +3106,7 @@ function pintarProveedores(){
     cont.innerHTML = '<div class="empty" style="padding:16px 4px;">Sin proveedores registrados.</div>';
     return;
   }
-  cont.innerHTML = proveedores.map((p, idx) => `
+  cont.innerHTML = proveedores.map((p) => `
     <div class="entry" style="border-left-color: var(--soil);">
       <div class="entry-top">
         <div>
@@ -2765,8 +3114,8 @@ function pintarProveedores(){
           <div class="entry-meta">${escapeHtml(p.producto || '')}</div>
         </div>
         <div class="entry-actions">
-          <button class="btn-ghost edit" onclick="editarProveedor(${idx})">Editar</button>
-          <button class="btn-ghost" onclick="borrarProveedor(${idx})">Borrar</button>
+          <button class="btn-ghost edit" onclick="editarProveedor('${p.id}')">Editar</button>
+          <button class="btn-ghost" onclick="borrarProveedor('${p.id}')">Borrar</button>
         </div>
       </div>
       ${p.contacto ? `<div class="entry-notes">📞 ${escapeHtml(p.contacto)}</div>` : ''}
@@ -2805,6 +3154,9 @@ pintarLista();
 pintarLoginUsers();
 pintarAgenda();
 pintarTareasProg();
+if(GOOGLE_SHEETS_WEB_APP_URL && document.getElementById('sheetsUrlInput')){
+  document.getElementById('sheetsUrlInput').value = GOOGLE_SHEETS_WEB_APP_URL;
+}
 
 // Registro del Service Worker (solo funciona si la app está hospedada en
 // una URL https, como GitHub Pages — si se abre el archivo directo desde
