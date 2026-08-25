@@ -3,23 +3,6 @@
   ======================================================================
   🍓 BITÁCORA DEL INVERNADERO — index.html
   ======================================================================
-  CÓMO PUBLICAR ESTA APP EN GITHUB PAGES (gratis, con URL https):
-  1) Crea una cuenta en https://github.com si no tienes una, y crea un
-     repositorio nuevo (puede ser público), por ejemplo "bitacora-invernadero".
-  2) Sube este archivo al repositorio y renómbralo exactamente "index.html"
-     (arrastra el archivo en la pestaña "Add file" > "Upload files").
-  3) Ve a Settings > Pages, en "Branch" elige "main" y carpeta "/ (root)",
-     dale a Save.
-  4) Espera 1-2 minutos: GitHub te da un enlace tipo
-     https://tu-usuario.github.io/bitacora-invernadero/ — esa es la URL
-     que abren ambos teléfonos para instalar la app ("Agregar a inicio").
-
-  CÓMO CONECTAR GOOGLE SHEETS (respaldo automático en la nube):
-  Busca la constante GOOGLE_SHEETS_WEB_APP_URL dentro del <script> más abajo
-  y pega ahí la URL de tu Web App de Google Apps Script (ver guía completa
-  y el código de Apps Script que te compartí aparte). También puedes pegar
-  esa misma URL desde la pestaña Historial dentro de la app.
-  ======================================================================
 -->
 <html lang="es">
 <head>
@@ -199,11 +182,6 @@
     font-weight: 700;
     margin-top: 10px;
   }
-  .btn-ghost{
-    background:none; border:none; color:#a33; font-size:13px; font-weight:600; padding:6px;
-  }
-  .entry-actions{ display:flex; gap:2px; flex-shrink:0; }
-  .btn-ghost.edit{ color: var(--moss-dark); }
   .entry{
     background:#fff;
     border:1px solid var(--linea);
@@ -220,9 +198,6 @@
     padding: 3px 9px; border-radius:20px; margin-top:6px; margin-right:5px;
     background: var(--crema-2); color: var(--moss-dark);
   }
-  .dots{ display:flex; gap:3px; margin-top:8px; }
-  .dot{ width:9px; height:9px; border-radius:50%; background: var(--linea); }
-  .dot.on{ background: var(--fresa); }
   .entry-notes{ font-size:13.5px; margin-top:8px; color:#3f3a2f; line-height:1.4; }
   .empty{ text-align:center; padding: 40px 20px; color:#9a917a; font-size:14px; }
   .empty .big{ font-size:34px; margin-bottom:8px; }
@@ -240,149 +215,31 @@
   nav.tabbar button.active{ color: var(--fresa-dark); }
   .tab-panel{ display:none; }
   .tab-panel.active{ display:block; }
-  .row2{ display:flex; gap:10px; }
-  .row2 > div{ flex:1; }
-  .filecount{ font-size:12px; color:#8a8270; text-align:center; margin-top:6px; }
-  input[type=file]{ display:none; }
-
-  .insumos-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
-  .insumo-row{ display:flex; gap:6px; align-items:center; }
-  .insumo-row select{ flex:1.4; padding:10px 8px; font-size:14px; }
-  .insumo-row input{ flex:1; padding:10px 8px; font-size:14px; }
-  .insumo-quitar{
-    background:#f4e2e2; border:none; color:#a33; border-radius:8px;
-    width:36px; height:38px; font-weight:700; flex-shrink:0; font-size:15px;
-  }
-  .camas-chk{ max-height:260px; overflow-y:auto; border:1.5px solid var(--linea); border-radius:9px; padding:2px 8px; background:var(--crema); }
-  .camas-chk .chk-row{ border-bottom:1px solid var(--linea); }
-  .camas-chk .chk-row:last-child{ border-bottom:none; }
-
-  .mapa-col-header{ display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:6px; margin-bottom:6px; }
-  .mapa-col-header div{
-    text-align:center; font-weight:800; font-size:13px; color:#fff;
-    padding:5px 0; border-radius:6px; min-width:0; box-sizing:border-box;
-  }
-  .mapa-grid{ display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:6px; margin-bottom:14px; }
-  .mapa-cell{
-    aspect-ratio:1; border-radius:8px; display:flex; align-items:center; justify-content:center;
-    font-weight:700; font-size:13px; position:relative;
-    border: 3px solid transparent; min-width:0; box-sizing:border-box;
-  }
-  .mapa-cell.alerta::after{
-    content:"⚠️"; position:absolute; top:2px; right:3px; font-size:10px;
-  }
-  .mapa-leyenda{ display:flex; flex-wrap:wrap; gap:8px 14px; }
-  .mapa-leyenda-item{ display:flex; align-items:center; gap:5px; font-size:11.5px; color:#6b6350; }
-  .mapa-leyenda-dot{ width:11px; height:11px; border-radius:3px; flex-shrink:0; }
-  .resumen-row{
-    display:flex; justify-content:space-between; align-items:center; gap:8px;
-    padding: 9px 4px; border-bottom: 1px solid var(--crema-2); font-size:13px;
-  }
-  .resumen-row:last-child{ border-bottom:none; }
-  .resumen-cama-code{ font-weight:700; width:32px; flex-shrink:0; }
-  .resumen-etapa{ flex:1; }
-  .resumen-alerta{ color:#a33; font-size:11.5px; text-align:right; }
-
   .tarea-grid{
     display:grid;
     grid-template-columns: minmax(0,1fr) minmax(0,1fr);
     gap: 10px;
   }
   .tarea-tile{
-    border: none;
+    border: 1.5px solid var(--linea);
     border-radius: 12px;
     padding: 16px 10px;
-    color: #fff;
+    background: #fff;
+    color: var(--tinta);
     font-weight: 700;
     font-size: 14px;
     text-align:center;
     line-height:1.3;
-    opacity: 0.92;
     position: relative;
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-    word-break: break-word;
+    cursor: pointer;
   }
   .tarea-tile .ic{ display:block; font-size:24px; margin-bottom:6px; }
   .tarea-tile.active{
-    opacity: 1;
-    outline: 3px solid var(--tinta);
-    outline-offset: 2px;
-  }
-  .tarea-tile.active::after{
-    content: "✓";
-    position: absolute;
-    top: 6px; right: 8px;
-    font-size: 14px;
-    background: rgba(255,255,255,0.9);
-    color: var(--tinta);
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    display:flex; align-items:center; justify-content:center;
+    border-color: var(--fresa);
+    background: #FCEFEF;
+    outline: 2px solid var(--fresa);
   }
   .hidden{ display:none !important; }
-  .campos-section-header{
-    font-weight:800; color: var(--moss-dark); font-size:13px; text-transform:uppercase;
-    letter-spacing:0.4px; margin: 18px 0 8px 0; padding-top:14px; border-top: 1.5px dashed var(--linea);
-  }
-  .campos-section-header:first-child{ margin-top:0; padding-top:0; border-top:none; }
-
-  .modal-overlay{
-    position:fixed; inset:0; background:rgba(30,50,32,0.55); z-index:1000;
-  }
-  .modal-card{
-    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-    background:#fff; width:92%; max-width:520px; max-height:85vh; overflow-y:auto;
-    border-radius:16px; padding:18px; z-index:1001; box-sizing:border-box;
-  }
-  .modal-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-  .modal-header h3{ font-family:Georgia,serif; font-size:17px; color:var(--moss-dark); margin:0; }
-  .modal-close{ background:var(--crema-2); border:none; border-radius:50%; width:30px; height:30px; font-size:14px; font-weight:700; color:var(--tinta); }
-  .modal-row{ display:flex; justify-content:space-between; gap:10px; padding:9px 2px; border-bottom:1px solid var(--crema-2); font-size:13.5px; }
-  .modal-row:last-child{ border-bottom:none; }
-  .modal-row .k{ color:#8a8270; font-weight:700; }
-  .modal-section-title{ font-weight:800; color:var(--moss-dark); font-size:12.5px; text-transform:uppercase; margin:14px 0 6px; }
-
-  .now-badge{
-    text-align:center;
-    font-size:12.5px;
-    color: #6b6350;
-    background: var(--crema-2);
-    border-radius: 20px;
-    padding: 6px 12px;
-    display:inline-block;
-    margin-bottom: 4px;
-  }
-
-  .calendar-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-  .calendar-nav button{
-    background: var(--crema-2); border:none; border-radius:8px;
-    font-size:18px; color:var(--moss-dark); padding:6px 14px; font-weight:700;
-  }
-  .calendar-month-label{ font-weight:700; font-size:15px; color:var(--tinta); text-transform:capitalize; }
-  .cal-grid{ display:grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap:4px; }
-  .cal-dow{ text-align:center; font-size:11px; font-weight:700; color:#9a917a; padding-bottom:4px; min-width:0; }
-  .cal-day{
-    aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    border-radius:8px; font-size:13px; font-weight:600; background: var(--crema); color: var(--tinta);
-    border: 1.5px solid transparent; min-width:0; box-sizing:border-box; overflow:hidden;
-  }
-  .cal-day.empty{ background:none; }
-  .cal-day.today{ border-color: var(--moss); }
-  .cal-day.selected{ background: var(--moss); color:#fff; }
-  .cal-dots{ display:flex; gap:2px; margin-top:2px; height:6px; }
-  .cal-dots span{ width:5px; height:5px; border-radius:50%; }
-  .week-row{
-    display:flex; justify-content:space-between; align-items:center;
-    padding: 10px 4px; border-bottom: 1px solid var(--crema-2); font-size:13.5px;
-  }
-  .week-row:last-child{ border-bottom:none; }
-  .week-row .wcount{ font-weight:700; color: var(--fresa-dark); }
-
-  .cal-dow-row{ display:grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap:4px; margin-bottom:6px; }
-
-  /* ---------- LOGIN ---------- */
   #loginOverlay{
     position:fixed; inset:0; background: linear-gradient(135deg, var(--moss) 0%, var(--moss-dark) 100%);
     z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;
@@ -393,95 +250,10 @@
   .login-user-btn{
     width:100%; padding:14px; margin-bottom:10px; border-radius:10px; border:1.5px solid var(--linea);
     background:var(--crema); font-size:15px; font-weight:700; color:var(--tinta); text-align:left;
-    display:flex; align-items:center; justify-content:space-between;
+    display:flex; align-items:center; justify-content:space-between; cursor:pointer;
   }
-  .login-user-btn .rol-tag{ font-size:10.5px; font-weight:700; color:#fff; background:var(--moss); padding:3px 8px; border-radius:20px; text-transform:uppercase; }
-  .login-pin-box{ display:none; margin-top:8px; }
-  .login-pin-box.show{ display:block; }
-  .login-error{ color:#a33; font-size:12.5px; text-align:center; margin-top:8px; }
-  .sesion-bar{ display:flex; align-items:center; justify-content:space-between; padding:8px 0 2px; font-size:12.5px; opacity:0.9; position:relative; }
+  .sesion-bar{ display:flex; align-items:center; justify-content:space-between; padding:8px 0 2px; font-size:12.5px; opacity:0.9; }
   .sesion-bar button{ background:rgba(255,255,255,0.15); border:none; color:#fff; padding:5px 10px; border-radius:20px; font-size:11.5px; font-weight:700; }
-
-  /* ---------- CISTERNA / DEPÓSITO DE AGUA ---------- */
-  .cisterna-botones{ display:flex; gap:8px; margin-bottom:12px; }
-  .cisterna-bar-track{ width:100%; height:28px; background:var(--crema-2); border-radius:8px; overflow:hidden; border:1.5px solid var(--linea); }
-  .cisterna-bar-fill{ height:100%; background: linear-gradient(90deg, #3D7EA6, #6FB1D9); display:flex; align-items:center; justify-content:flex-end; padding-right:8px; color:#fff; font-weight:700; font-size:12px; }
-  .cisterna-radios{ display:flex; justify-content:space-between; margin-top:10px; }
-  .cisterna-radio{ display:flex; flex-direction:column; align-items:center; gap:5px; font-size:11px; color:#6b6350; font-weight:700; }
-  .cisterna-radio input{ width:20px; height:20px; accent-color:#3D7EA6; }
-  .cisterna-fuente{ text-align:center; font-size:12px; color:#6b6350; margin-top:8px; }
-
-  .deposito-tanque{
-    width:100%; height:120px; background:var(--crema-2); border-radius:14px; border:2px solid var(--linea);
-    position:relative; overflow:hidden; margin-bottom:12px;
-  }
-  .deposito-agua{
-    position:absolute; bottom:0; left:0; right:0; background: linear-gradient(180deg, #6FB1D9, #2E6E8E);
-    display:flex; align-items:flex-start; justify-content:center; padding-top:6px;
-    font-weight:800; color:#fff; font-size:15px;
-  }
-  .deposito-niveles{ display:flex; justify-content:space-between; gap:6px; }
-  .deposito-niveles button{
-    flex:1; padding:10px 4px; border-radius:8px; border:1.5px solid var(--linea); background:#fff;
-    font-size:12.5px; font-weight:700; color:var(--tinta);
-  }
-  .deposito-niveles button.active{ background:#2E6E8E; border-color:#2E6E8E; color:#fff; }
-
-  .otro-subtile-grid{ display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:14px; }
-  .otro-subtile{
-    border: 1.5px solid var(--linea); background:#fff; border-radius:12px; padding:14px 6px;
-    text-align:center; font-size:12px; font-weight:700; color:var(--tinta); min-width:0;
-  }
-  .otro-subtile .ic{ display:block; font-size:28px; margin-bottom:6px; }
-  .otro-subtile.active{ border-color: var(--fresa); background: #FCEFEF; outline:2px solid var(--fresa); }
-
-  .clima-icon-grid{ display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:8px; }
-  .clima-icon-tile{
-    border:1.5px solid var(--linea); background:#fff; border-radius:12px; padding:14px 6px;
-    text-align:center; font-size:13px; font-weight:700; color:var(--tinta); min-width:0;
-  }
-  .clima-icon-tile .ic{ display:block; font-size:28px; margin-bottom:6px; }
-  .clima-icon-tile.active{ border-color: var(--fresa); background:#FCEFEF; outline:2px solid var(--fresa); }
-
-  /* ---------- CLIMA ---------- */
-  .clima-botones{ display:flex; gap:8px; }
-  .clima-btn{
-    flex:1; padding:12px 6px; border-radius:10px; border:1.5px solid var(--linea); background:var(--crema);
-    font-size:13.5px; font-weight:700; color:var(--tinta);
-  }
-  .clima-btn.on{ background:#3D7EA6; border-color:#3D7EA6; color:#fff; }
-  .clima-tag{ font-size:13px; margin-right:6px; }
-
-  /* ---------- AGENDA / TAREAS PROGRAMADAS ---------- */
-  .agenda-row{
-    display:flex; align-items:flex-start; justify-content:space-between; gap:8px;
-    padding:10px 4px; border-bottom:1px solid var(--crema-2);
-  }
-  .agenda-row:last-child{ border-bottom:none; }
-  .agenda-row .agenda-info{ font-size:13.5px; }
-  .agenda-row .agenda-fecha{ font-size:11.5px; color:#8a8270; font-weight:700; }
-  .tarea-prog-row{
-    display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--crema-2);
-  }
-  .tarea-prog-row:last-child{ border-bottom:none; }
-  .tarea-prog-row.completada{ opacity:0.5; text-decoration:line-through; }
-  .tarea-prog-row input[type=checkbox]{ width:20px; height:20px; accent-color:var(--fresa); flex-shrink:0; }
-  .tarea-prog-info{ flex:1; font-size:13.5px; }
-  .btn-mini{ background:var(--crema-2); border:none; color:var(--moss-dark); font-size:11.5px; font-weight:700; padding:6px 10px; border-radius:20px; flex-shrink:0; }
-
-  /* ---------- BUSCADOR FITOSANITARIO ---------- */
-  .buscador-resultado{
-    background:#fff; border:1px solid var(--linea); border-left:5px solid var(--moss); border-radius:10px;
-    padding:12px 14px; margin-bottom:10px;
-  }
-  .stock-tag{ font-size:12px; font-weight:700; }
-
-  /* ---------- ADMIN / ROLES ---------- */
-  .rol-badge{ display:inline-block; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px; background:var(--moss); color:#fff; text-transform:uppercase; margin-left:6px; }
-  .balance-num{ font-size:26px; font-weight:800; text-align:center; margin:6px 0; }
-  .balance-label{ text-align:center; font-size:12px; color:#8a8270; text-transform:uppercase; letter-spacing:0.5px; }
-  .balance-row{ display:flex; justify-content:space-between; padding:9px 4px; border-bottom:1px solid var(--crema-2); font-size:14px; }
-  .balance-row:last-child{ border-bottom:none; }
 </style>
 </head>
 <body>
@@ -490,13 +262,8 @@
   <div class="login-card">
     <h1>🍓 Invernadero</h1>
     <p>Selecciona tu usuario para entrar</p>
-    <div id="loginUserList"></div>
-    <div class="login-pin-box" id="loginPinBox">
-      <label style="margin-top:10px;">PIN de administrador</label>
-      <input type="text" inputmode="numeric" id="loginPinInput" placeholder="••••" maxlength="8">
-      <button class="btn-primary" style="margin-top:10px;" onclick="intentarLogin()">Entrar</button>
-      <div class="login-error hidden" id="loginError">PIN incorrecto. Intenta de nuevo.</div>
-    </div>
+    <button class="login-user-btn" onclick="seleccionarUsuario('Mamá')">👩‍🌾 Mamá</button>
+    <button class="login-user-btn" onclick="seleccionarUsuario('Empleado')">👨‍🌾 Empleado</button>
   </div>
 </div>
 
@@ -504,7 +271,7 @@
   <h1>🍓 Invernadero</h1>
   <p>Registro diario · funciona sin internet</p>
   <div class="sesion-bar">
-    <span id="sesionUsuarioTxt">—</span>
+    <span id="sesionUsuarioTxt">Sin usuario</span>
     <button onclick="cerrarSesion()">Cambiar usuario</button>
   </div>
   <div id="syncEstadoBadge" class="sync-badge sync-badge--offline">● Conectando…</div>
@@ -514,206 +281,33 @@
 
   <!-- TAB: NUEVO REGISTRO -->
   <div class="tab-panel active" id="tab-nuevo">
-
-    <div class="card" id="tareasProgCard">
-      <h2>Tareas programadas de hoy</h2>
-      <div id="listaTareasProg"></div>
-    </div>
-
     <div class="card">
       <h2>Tipo de tarea</h2>
-      <div class="tarea-grid" id="tareaGrid"></div>
+      <div class="tarea-grid">
+        <div class="tarea-tile" data-tarea="Riego" onclick="seleccionarTarea(this)"><span class="ic">💧</span>Riego</div>
+        <div class="tarea-tile" data-tarea="Cosecha" onclick="seleccionarTarea(this)"><span class="ic">🍓</span>Cosecha</div>
+        <div class="tarea-tile" data-tarea="Fitosanitario" onclick="seleccionarTarea(this)"><span class="ic">🛡️</span>Fitosanitario</div>
+        <div class="tarea-tile" data-tarea="Mantenimiento" onclick="seleccionarTarea(this)"><span class="ic">🔧</span>Mantenimiento</div>
+      </div>
     </div>
 
     <div id="restoForm" class="hidden">
-      <div class="card" id="camposCard">
-        <h2 id="camposTitulo">Detalles</h2>
-        <div id="camposEspecificos"></div>
-      </div>
-
       <div class="card">
-        <h2>Notas</h2>
+        <h2>Detalles y Notas</h2>
+        <div id="camposEspecificos"></div>
+        <label>Notas adicionales</label>
         <textarea id="notas" placeholder="Observaciones, cantidad cosechada, plaga detectada, etc."></textarea>
-        <div style="text-align:center;"><span class="now-badge" id="nowBadge">🕒 se guardará con la fecha y hora de hoy</span></div>
-        <button class="btn-primary" id="btnGuardar" onclick="agregarRegistro()">Agregar registro</button>
-        <button class="btn-secondary hidden" id="btnCancelarEdicion" onclick="cancelarEdicion()">Cancelar edición</button>
+        <button class="btn-primary" onclick="agregarRegistro()">Agregar registro</button>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Registros recientes</h2>
+      <div id="listaRegistros"></div>
     </div>
   </div>
 
-  <!-- TAB: CALENDARIO -->
-  <div class="tab-panel" id="tab-calendario">
-    <div class="card">
-      <div class="calendar-nav">
-        <button onclick="cambiarMes(-1)">‹</button>
-        <div class="calendar-month-label" id="calMesLabel"></div>
-        <button onclick="cambiarMes(1)">›</button>
-      </div>
-      <div class="cal-dow-row" id="calDowRow"></div>
-      <div class="cal-grid" id="calGrid"></div>
-    </div>
-
-    <div class="card">
-      <h2>Agenda de eventos</h2>
-      <label>Fecha</label>
-      <input type="date" id="agendaFecha">
-      <label>Hora (opcional)</label>
-      <input type="text" id="agendaHora" placeholder="Ej. 08:00">
-      <label>Evento / pendiente</label>
-      <input type="text" id="agendaTexto" placeholder="Ej. Pedido de fertilizante">
-      <label class="chk-row" style="padding-left:0;">
-        <input type="checkbox" id="agendaRecordar"><span>Recordarme (mientras la app esté abierta)</span>
-      </label>
-      <button class="btn-primary" onclick="agregarEvento()">+ Agregar evento</button>
-      <p style="font-size:11.5px; color:#8a8270; margin:10px 0 0; line-height:1.4;">El recordatorio solo funciona si dejas esta pestaña abierta en el teléfono — un archivo offline no puede mandar alarmas del sistema si la app está cerrada.</p>
-      <div id="listaAgenda" style="margin-top:12px;"></div>
-    </div>
-
-    <div class="card">
-      <h2>Resumen semanal</h2>
-      <div id="calSemanas"></div>
-    </div>
-  </div>
-
-  <!-- Modal: detalle del día -->
-  <div id="diaModalOverlay" class="modal-overlay hidden" onclick="if(event.target===this) cerrarDiaModal()">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="diaModalTitulo">Día</h3>
-        <button class="modal-close" onclick="cerrarDiaModal()">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="modal-section-title">✅ Actividades realizadas</div>
-        <div id="diaModalRegistros"></div>
-        <div class="modal-section-title">🗓️ Agendado para este día</div>
-        <div id="diaModalAgenda"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB: MAPEO -->
-  <div class="tab-panel" id="tab-mapeo">
-    <div class="card">
-      <h2>Plano del invernadero</h2>
-      <p style="font-size:12px; color:#8a8270; margin:-6px 0 12px;">Toca una cama para ver su detalle.</p>
-      <div class="mapa-col-header" id="mapaColHeader"></div>
-      <div class="mapa-grid" id="mapaGrid"></div>
-      <div class="mapa-leyenda" id="mapaLeyenda"></div>
-    </div>
-
-    <div class="card">
-      <h2>Resumen por cama</h2>
-      <div id="mapaResumen"></div>
-    </div>
-
-    <div class="card">
-      <h2>Descripción de columnas</h2>
-      <div id="colDescList"></div>
-    </div>
-  </div>
-
-  <!-- Modal: detalle de cama -->
-  <div id="camaModalOverlay" class="modal-overlay hidden" onclick="if(event.target===this) cerrarCamaModal()">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="camaModalTitulo">Cama</h3>
-        <button class="modal-close" onclick="cerrarCamaModal()">✕</button>
-      </div>
-      <div class="modal-body" id="camaModalBody"></div>
-    </div>
-  </div>
-
-  <!-- TAB: INVENTARIO -->
-  <div class="tab-panel" id="tab-inventario">
-    <div class="card">
-      <h2 id="invTitulo">Agregar insumo</h2>
-      <label>Nombre del producto / insumo</label>
-      <input type="text" id="invNombre" placeholder="Ej. Nitrato de calcio">
-      <label>Categoría / para qué sirve</label>
-      <input type="text" id="invCategoria" placeholder="Ej. Fertilizante, fungicida, insecticida...">
-      <div class="row2">
-        <div>
-          <label>Tipo de problema que atiende</label>
-          <select id="invTipoProblema">
-            <option value="">N/A</option>
-            <option value="Plaga">Plaga</option>
-            <option value="Hongo">Hongo</option>
-            <option value="Deficiencia">Deficiencia</option>
-          </select>
-        </div>
-        <div>
-          <label>Subcategoría</label>
-          <input type="text" id="invSubcategoria" placeholder="Ej. Trips, Botrytis...">
-        </div>
-      </div>
-      <label>Disponibilidad</label>
-      <select id="invEstado">
-        <option value="En bodega">🟢 En bodega</option>
-        <option value="Sin stock">🔴 Sin stock / por comprar</option>
-      </select>
-      <label>Evaluación de eficacia (¿ha funcionado?)</label>
-      <textarea id="invEvaluacion" placeholder="Notas sobre resultados observados"></textarea>
-      <div class="row2">
-        <div>
-          <label>Dosis recomendada</label>
-          <input type="text" id="invDosisRecom" placeholder="Ej. 2 ml/L">
-        </div>
-        <div>
-          <label>Dosis aplicada</label>
-          <input type="text" id="invDosisAplicada" placeholder="Ej. 2 ml/L">
-        </div>
-      </div>
-      <div class="row2">
-        <div>
-          <label>Unidad de compra</label>
-          <input type="text" id="invUnidad" placeholder="Ej. Litro, Kg, Bolsa 1kg">
-        </div>
-        <div>
-          <label>Precio</label>
-          <input type="number" id="invPrecio" step="0.01" placeholder="Ej. 250">
-        </div>
-      </div>
-      <label>Proveedor / lugar de compra</label>
-      <input type="text" id="invProveedor" placeholder="Ej. Agroquímicos del Bajío">
-      <button class="btn-primary" id="btnGuardarInsumo" onclick="guardarInsumo()">Agregar insumo</button>
-      <button class="btn-secondary hidden" id="btnCancelarInsumo" onclick="cancelarEdicionInsumo()">Cancelar edición</button>
-    </div>
-
-    <div class="card">
-      <h2>Insumos registrados</h2>
-      <button class="btn-secondary" onclick="exportarInventarioCSV()">⬇️ Exportar inventario a Excel (CSV)</button>
-      <div id="listaInventario" style="margin-top:12px;"></div>
-    </div>
-
-    <div class="card">
-      <h2>Buscador fitosanitario</h2>
-      <label>Tipo de problema</label>
-      <select id="buscadorTipo">
-        <option value="">Todos</option>
-        <option value="Plaga">Plaga</option>
-        <option value="Hongo">Hongo</option>
-        <option value="Deficiencia">Deficiencia</option>
-      </select>
-      <label>Subcategoría / palabra clave</label>
-      <input type="text" id="buscadorTexto" placeholder="Ej. Trips, Botrytis, Calcio..." oninput="buscarFitosanitario()">
-      <div id="buscadorResultados" style="margin-top:12px;"></div>
-    </div>
-
-    <div class="card">
-      <h2 id="provTitulo">Agregar proveedor</h2>
-      <label>Nombre del proveedor</label>
-      <input type="text" id="provNombre" placeholder="Ej. Agroquímicos del Bajío">
-      <label>Contacto</label>
-      <input type="text" id="provContacto" placeholder="Teléfono, WhatsApp o correo">
-      <label>Producto(s) que provee</label>
-      <input type="text" id="provProducto" placeholder="Ej. Fertilizantes, plaguicidas...">
-      <button class="btn-primary" id="btnGuardarProveedor" onclick="guardarProveedor()">Agregar proveedor</button>
-      <button class="btn-secondary hidden" id="btnCancelarProveedor" onclick="cancelarEdicionProveedor()">Cancelar edición</button>
-      <div id="listaProveedores" style="margin-top:12px;"></div>
-    </div>
-  </div>
-
-  <!-- TAB: NOTAS -->
+  <!-- TAB: NOTAS Y AVISOS -->
   <div class="tab-panel" id="tab-notas">
     <div class="card">
       <h2>Avisos y pendientes</h2>
@@ -722,90 +316,199 @@
       <button class="btn-secondary" onclick="agregarAviso()">+ Agregar aviso</button>
       <div class="chk-grid" id="listaAvisos" style="margin-top:12px;"></div>
     </div>
-
-    <div class="card">
-      <h2>Notas libres</h2>
-      <textarea id="notasLibresArea" style="min-height:240px;" placeholder="Escribe aquí cualquier nota, idea o pendiente general..." oninput="guardarNotasLibres()"></textarea>
-    </div>
-  </div>
-
-  <!-- TAB: BALANCE (solo admin) -->
-  <div class="tab-panel" id="tab-balance">
-    <div class="card">
-      <div class="userpicker" id="balanceSubNav"></div>
-    </div>
-
-    <div id="balanceSub-ventas">
-      <div class="card">
-        <h2>Registrar venta</h2>
-        <label>Kilos vendidos</label>
-        <input type="number" id="ventaKilos" step="0.1" placeholder="Ej. 25">
-        <label>Precio por kilo</label>
-        <input type="number" id="ventaPrecio" step="0.01" placeholder="Ej. 45">
-        <label>Cliente / comprador</label>
-        <select id="ventaClienteSelect"><option value="">Sin especificar</option></select>
-        <button class="btn-primary" onclick="guardarVenta()">Agregar venta</button>
-      </div>
-      <div class="card">
-        <h2>Ventas registradas</h2>
-        <button class="btn-secondary" onclick="exportarVentasCSV()">⬇️ Exportar ventas a Excel (CSV)</button>
-        <div id="listaVentas" style="margin-top:12px;"></div>
-      </div>
-    </div>
-
-    <div id="balanceSub-gastos" class="hidden">
-      <div class="card">
-        <h2>Registrar gasto</h2>
-        <label>Categoría</label>
-        <div class="userpicker" id="gastoCategoriaPicker"></div>
-        <label>Monto</label>
-        <input type="number" id="gastoMonto" step="0.01" placeholder="Ej. 500">
-        <label>Descripción</label>
-        <input type="text" id="gastoDescripcion" placeholder="Ej. Pago de jornaleros">
-        <button class="btn-primary" onclick="guardarGasto()">Agregar gasto</button>
-      </div>
-      <div class="card">
-        <h2>Gastos registrados</h2>
-        <button class="btn-secondary" onclick="exportarGastosCSV()">⬇️ Exportar gastos a Excel (CSV)</button>
-        <div id="listaGastos" style="margin-top:12px;"></div>
-      </div>
-    </div>
   </div>
 
 </div>
 
-<!-- REGISTRO DEL SERVICE WORKER CON DETECTOR DE ACTUALIZACIONES -->
+<nav class="tabbar">
+  <button class="active" onclick="cambiarTab('tab-nuevo', this)"><span class="ic">📝</span>Registro</button>
+  <button onclick="cambiarTab('tab-notas', this)"><span class="ic">📌</span>Avisos</button>
+</nav>
+
 <script>
+// ======================================================================
+// 1. CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE
+// ======================================================================
+const firebaseConfig = {
+  apiKey: "TU_API_KEY_AQUI",
+  authDomain: "tu-proyecto.firebaseapp.com",
+  projectId: "tu-proyecto-id",
+  storageBucket: "tu-proyecto.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef123456"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// 2. ACTIVAR SOPORTE OFFLINE AUTOMÁTICO
+db.enablePersistence({ synchronizeTabs: true })
+  .then(() => {
+    actualizarBadgeSync('ok', '● Sin conexión (guardando local)');
+  })
+  .catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Persistencia offline limitada: Múltiples pestañas abiertas.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('El navegador no soporta persistencia de datos local.');
+    }
+  });
+
+window.addEventListener('online', () => actualizarBadgeSync('ok', '● En línea (sincronizado)'));
+window.addEventListener('offline', () => actualizarBadgeSync('offline', '● Sin conexión (guardando local)'));
+
+function actualizarBadgeSync(estado, texto) {
+  const badge = document.getElementById('syncEstadoBadge');
+  if (!badge) return;
+  badge.className = `sync-badge sync-badge--${estado}`;
+  badge.textContent = texto;
+}
+
+// ======================================================================
+// 3. LÓGICA DE USUARIOS Y NAVEGACIÓN
+// ======================================================================
+function seleccionarUsuario(nombre) {
+  document.getElementById('sesionUsuarioTxt').textContent = nombre;
+  document.getElementById('loginOverlay').classList.add('hidden');
+}
+
+function cerrarSesion() {
+  document.getElementById('loginOverlay').classList.remove('hidden');
+}
+
+function cambiarTab(tabId, btn) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('nav.tabbar button').forEach(el => el.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  btn.classList.add('active');
+}
+
+function seleccionarTarea(el) {
+  document.querySelectorAll('.tarea-tile').forEach(tile => tile.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('restoForm').classList.remove('hidden');
+}
+
+// ======================================================================
+// 4. FUNCIONES DE LECTURA Y ESCRITURA EN TIEMPO REAL
+// ======================================================================
+function agregarRegistro() {
+  const usuarioActivo = document.getElementById('sesionUsuarioTxt')?.textContent || 'Anonimo';
+  const tipoTarea = document.querySelector('.tarea-tile.active')?.dataset?.tarea || 'General';
+  const notasText = document.getElementById('notas')?.value || '';
+
+  const datosRegistro = {
+    usuario: usuarioActivo,
+    tarea: tipoTarea,
+    notas: notasText,
+    fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(),
+    fechaFormato: new Date().toLocaleDateString('es-MX', { hour: '2-digit', minute: '2-digit' })
+  };
+
+  actualizarBadgeSync('saving', '● Guardando...');
+
+  db.collection("registros").add(datosRegistro)
+    .then(() => {
+      limpiarFormulario();
+      actualizarBadgeSync('ok', '● En línea (sincronizado)');
+    })
+    .catch((error) => {
+      console.error("Error al guardar en Firestore:", error);
+      actualizarBadgeSync('offline', '● Guardado localmente');
+    });
+}
+
+function limpiarFormulario() {
+  const notas = document.getElementById('notas');
+  if (notas) notas.value = '';
+  document.querySelectorAll('.tarea-tile').forEach(tile => tile.classList.remove('active'));
+  document.getElementById('restoForm').classList.add('hidden');
+}
+
+function cargarRegistrosEnTiempoReal() {
+  db.collection("registros")
+    .orderBy("fechaCreacion", "desc")
+    .limit(50)
+    .onSnapshot((snapshot) => {
+      const listaRegistros = [];
+      snapshot.forEach((doc) => {
+        listaRegistros.push({ id: doc.id, ...doc.data() });
+      });
+      renderizarListaRegistros(listaRegistros);
+    });
+}
+
+function renderizarListaRegistros(registros) {
+  const contenedor = document.getElementById('listaRegistros');
+  if (!contenedor) return;
+
+  if (registros.length === 0) {
+    contenedor.innerHTML = '<div class="empty"><div class="big">🌱</div>Sin registros recientes</div>';
+    return;
+  }
+
+  contenedor.innerHTML = registros.map(reg => `
+    <div class="entry">
+      <div class="entry-top">
+        <span class="entry-title">${reg.tarea || 'Tarea'}</span>
+        <span class="badge">${reg.usuario || 'Usuario'}</span>
+      </div>
+      <div class="entry-meta">🕒 ${reg.fechaFormato || 'Reciente'}</div>
+      ${reg.notas ? `<div class="entry-notes">${reg.notas}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function agregarAviso() {
+  const inputAviso = document.getElementById('avisoInput');
+  const texto = inputAviso?.value?.trim();
+  if (!texto) return;
+
+  db.collection("avisos").add({
+    texto: texto,
+    completado: false,
+    fecha: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => {
+    inputAviso.value = '';
+  });
+}
+
+function cargarAvisosEnTiempoReal() {
+  db.collection("avisos")
+    .orderBy("fecha", "desc")
+    .onSnapshot((snapshot) => {
+      const contenedor = document.getElementById('listaAvisos');
+      if (!contenedor) return;
+
+      contenedor.innerHTML = '';
+      snapshot.forEach((doc) => {
+        const aviso = doc.data();
+        const row = document.createElement('div');
+        row.className = 'chk-row';
+        row.innerHTML = `
+          <input type="checkbox" ${aviso.completado ? 'checked' : ''} onchange="toggleAviso('${doc.id}', this.checked)">
+          <span style="${aviso.completado ? 'text-decoration:line-through; opacity:0.6;' : ''}">${aviso.texto}</span>
+        `;
+        contenedor.appendChild(row);
+      });
+    });
+}
+
+function toggleAviso(id, estado) {
+  db.collection("avisos").doc(id).update({ completado: estado });
+}
+
+// ======================================================================
+// 5. SERVICE WORKER Y EVENTOS DE INICIALIZACIÓN
+// ======================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  cargarRegistrosEnTiempoReal();
+  cargarAvisosEnTiempoReal();
+});
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then((reg) => {
-
-      // Escuchar si se encuentra una versión nueva del sw.js en GitHub Pages
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // Notificar al usuario para recargar
-            if (confirm("🍓 Hay una nueva versión de la Bitácora disponible. ¿Deseas actualizar ahora?")) {
-              window.location.reload();
-            }
-          }
-        });
-      });
-
-    }).catch((err) => {
-      console.log('Error al registrar Service Worker:', err);
-    });
-
-    // Forzar la recarga automática cuando el nuevo Service Worker toma el control
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
-    });
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Error:', err));
   });
 }
 </script>
