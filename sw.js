@@ -1,39 +1,51 @@
-// Service Worker de la Bitácora del Invernadero
-// Guarda una copia de la app la primera vez que se abre con internet,
-// para que después funcione offline aunque se abra desde la URL de GitHub Pages.
+// Nombre de la caché (puedes cambiar v1 por v2, v3, etc., cada vez que quieras forzar recarga)
+const CACHE_NAME = 'bitacora-invernadero-v1.0.1';
 
-const CACHE_NAME = 'invernadero-cache-v1';
-const ARCHIVOS_A_GUARDAR = [
+// Archivos esenciales para funcionamiento offline
+const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './icon.svg'
 ];
 
+// Evento de Instalación: Fuerza a activar el nuevo service worker
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ARCHIVOS_A_GUARDAR))
-      .catch(() => {}) // si algún archivo no existe con ese nombre exacto, no rompe nada
-  );
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
+  );
 });
 
+// Evento de Activación: Toma control inmediato y limpia cachés antiguas
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((nombres) =>
-      Promise.all(
-        nombres.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))
-      )
-    )
+    clients.claim().then(() => {
+      return caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cache) => {
+            if (cache !== CACHE_NAME) {
+              return caches.delete(cache);
+            }
+          })
+        );
+      });
+    })
   );
-  self.clients.claim();
 });
 
+// Evento Fetch: Carga desde red y cae en caché si no hay internet
 self.addEventListener('fetch', (event) => {
+  // Ignorar peticiones a Firebase y scripts externos para que no interfiera la caché
+  if (event.request.url.includes('firestore') || event.request.url.includes('firebase')) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((respuestaCache) => {
-      return respuestaCache || fetch(event.request).catch(() => caches.match('./index.html'));
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
     })
   );
 });
