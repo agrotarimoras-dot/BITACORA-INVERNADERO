@@ -1148,6 +1148,15 @@ function renderCampos(tipo){
   });
 }
 
+// ---------- CAPTURA DINÁMICA DE CAMPOS ----------
+// Analiza qué tipo de tarea está seleccionada (Riego, Cosecha, Aplicación,
+// Mantenimiento, "Otro", etc.) y arma el objeto con los valores capturados
+// en los inputs generados dinámicamente para esa tarea, listos para
+// empaquetarse dentro del documento que se envía a Firestore.
+function capturarDetallesCampos(tipo){
+  return tipo === 'Otro' ? collectOtroCampos() : collectCampos(tipo);
+}
+
 function collectCampos(tipo){
   const fields = CAMPOS_CONFIG[tipo] || [];
   const data = {};
@@ -1393,7 +1402,7 @@ function agregarRegistro(){
     alert('Selecciona un tipo de tarea.');
     return;
   }
-  const camposData = tipoTareaSeleccionada === 'Otro' ? collectOtroCampos() : collectCampos(tipoTareaSeleccionada);
+  const camposData = capturarDetallesCampos(tipoTareaSeleccionada);
   const notas = document.getElementById('notas').value;
 
   if(editingIndex !== null){
