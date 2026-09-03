@@ -14,11 +14,10 @@
      https://tu-usuario.github.io/bitacora-invernadero/ — esa es la URL
      que abren ambos teléfonos para instalar la app ("Agregar a inicio").
 
-  CÓMO CONECTAR GOOGLE SHEETS (respaldo automático en la nube):
-  Busca la constante GOOGLE_SHEETS_WEB_APP_URL dentro del <script> más abajo
-  y pega ahí la URL de tu Web App de Google Apps Script (ver guía completa
-  y el código de Apps Script que te compartí aparte). También puedes pegar
-  esa misma URL desde la pestaña Historial dentro de la app.
+  CÓMO CONECTAR LA NUBE (Firebase, sincronización en tiempo real):
+  La app ya está conectada a un proyecto de Firebase (ver la constante
+  firebaseConfig dentro del <script> más abajo). Si algún día necesitas
+  cambiarla a otro proyecto de Firebase, edita esa constante ahí.
   ======================================================================
 -->
 <html lang="es">
@@ -1422,6 +1421,7 @@ function agregarRegistro(){
     alert('Selecciona un tipo de tarea.');
     return;
   }
+  if(!bloquearEnvioBreve('registro')) return;
   const camposData = capturarDetallesCampos(tipoTareaSeleccionada);
   const notas = document.getElementById('notas').value;
 
@@ -1664,6 +1664,7 @@ function pintarLista(){
 }
 
 function borrarRegistro(id){
+  if(!confirm('¿Borrar este registro de la bitácora? Esto lo quita para todo el equipo.')) return;
   const idx = registros.findIndex(x => x.id === id);
   if(idx === -1) return;
   registros.splice(idx, 1);
@@ -1835,6 +1836,18 @@ function generarId(){
   return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
 }
 
+// Evita que un doble toque en "Guardar" (común con mala señal, cuando la
+// persona no ve respuesta inmediata y vuelve a tocar) cree datos duplicados.
+// Se usa como guardia al inicio de cada función que guarda algo: si ya se
+// acaba de ejecutar esa misma acción hace menos de 900ms, la ignora.
+const _bloqueosEnvio = {};
+function bloquearEnvioBreve(clave, ms){
+  if(_bloqueosEnvio[clave]) return false;
+  _bloqueosEnvio[clave] = true;
+  setTimeout(() => { _bloqueosEnvio[clave] = false; }, ms || 900);
+  return true;
+}
+
 function escapeHtml(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
@@ -1965,6 +1978,7 @@ function pintarResumenMapa(){
 function guardarInsumo(){
   const nombre = document.getElementById('invNombre').value.trim();
   if(!nombre){ alert('Escribe el nombre del insumo.'); return; }
+  if(!bloquearEnvioBreve('insumo')) return;
   const datos = {
     nombre,
     ingredienteActivo: document.getElementById('invIngredienteActivo').value,
@@ -2095,6 +2109,7 @@ function agregarAviso(){
   const input = document.getElementById('avisoInput');
   const texto = input.value.trim();
   if(!texto) return;
+  if(!bloquearEnvioBreve('aviso')) return;
   const aviso = { id: generarId(), creado: Date.now(), texto, hecho:false };
   avisos.unshift(aviso);
   fsGuardarItem('avisos', aviso);
@@ -2111,6 +2126,7 @@ function toggleAviso(id){
 }
 
 function borrarAviso(id){
+  if(!confirm('¿Borrar este aviso?')) return;
   const idx = avisos.findIndex(x => x.id === id);
   if(idx === -1) return;
   avisos.splice(idx, 1);
@@ -2644,6 +2660,7 @@ function agregarEvento(){
   const texto = document.getElementById('agendaTexto').value.trim();
   const recordar = document.getElementById('agendaRecordar').checked;
   if(!fecha || !texto){ alert('Escribe la fecha y el evento.'); return; }
+  if(!bloquearEnvioBreve('evento')) return;
   const evento = { id: generarId(), fecha, hora, texto, recordar };
   eventos.push(evento);
   eventos.sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
@@ -2668,6 +2685,7 @@ function programarRecordatorio(evento){
   });
 }
 function borrarEvento(id){
+  if(!confirm('¿Borrar este evento de la agenda?')) return;
   const idx = eventos.findIndex(x => x.id === id);
   if(idx === -1) return;
   eventos.splice(idx, 1);
@@ -2779,6 +2797,7 @@ function guardarVenta(){
   const precio = parseFloat(document.getElementById('ventaPrecio').value) || 0;
   const cliente = document.getElementById('ventaClienteSelect').value;
   if(kilos <= 0){ alert('Ingresa los kilos vendidos.'); return; }
+  if(!bloquearEnvioBreve('venta')) return;
   const ahora = new Date();
   const venta = {
     id: generarId(), creado: Date.now(),
@@ -2794,6 +2813,7 @@ function guardarVenta(){
   pintarBalance();
 }
 function borrarVenta(id){
+  if(!confirm('¿Borrar esta venta? No se puede deshacer.')) return;
   const idx = ventas.findIndex(x => x.id === id);
   if(idx === -1) return;
   ventas.splice(idx,1);
@@ -2852,6 +2872,7 @@ function guardarGasto(){
   const monto = parseFloat(document.getElementById('gastoMonto').value) || 0;
   const descripcion = document.getElementById('gastoDescripcion').value;
   if(monto <= 0){ alert('Ingresa el monto del gasto.'); return; }
+  if(!bloquearEnvioBreve('gasto')) return;
   const ahora = new Date();
   const gasto = {
     id: generarId(), creado: Date.now(),
@@ -2866,6 +2887,7 @@ function guardarGasto(){
   pintarBalance();
 }
 function borrarGasto(id){
+  if(!confirm('¿Borrar este gasto? No se puede deshacer.')) return;
   const idx = gastos.findIndex(x => x.id === id);
   if(idx === -1) return;
   gastos.splice(idx,1);
@@ -2908,6 +2930,7 @@ let editingClienteIndex = null;
 function guardarCliente(){
   const nombre = document.getElementById('clienteNombre').value.trim();
   if(!nombre){ alert('Escribe el nombre del cliente.'); return; }
+  if(!bloquearEnvioBreve('cliente')) return;
   const datos = {
     nombre,
     contacto: document.getElementById('clienteContacto').value,
@@ -2949,6 +2972,7 @@ function cancelarEdicionCliente(){
   document.getElementById('btnCancelarCliente').classList.add('hidden');
 }
 function borrarCliente(id){
+  if(!confirm('¿Borrar este cliente?')) return;
   const idx = clientes.findIndex(x => x.id === id);
   if(idx === -1) return;
   clientes.splice(idx, 1);
@@ -3052,6 +3076,7 @@ let editingUsuarioIndex = null;
 function guardarUsuario(){
   const nombre = document.getElementById('adminUsrNombre').value.trim();
   if(!nombre){ alert('Escribe el nombre del usuario.'); return; }
+  if(!bloquearEnvioBreve('usuario')) return;
   const rol = document.getElementById('adminUsrRol').value;
   const pin = document.getElementById('adminUsrPin').value;
   let usuario;
@@ -3149,6 +3174,7 @@ let editingProveedorIndex = null;
 function guardarProveedor(){
   const nombre = document.getElementById('provNombre').value.trim();
   if(!nombre){ alert('Escribe el nombre del proveedor.'); return; }
+  if(!bloquearEnvioBreve('proveedor')) return;
   const datos = {
     nombre,
     contacto: document.getElementById('provContacto').value,
@@ -3189,6 +3215,7 @@ function cancelarEdicionProveedor(){
   document.getElementById('btnCancelarProveedor').classList.add('hidden');
 }
 function borrarProveedor(id){
+  if(!confirm('¿Borrar este proveedor?')) return;
   const idx = proveedores.findIndex(x => x.id === id);
   if(idx === -1) return;
   proveedores.splice(idx, 1);
@@ -3253,9 +3280,6 @@ pintarLista();
 pintarLoginUsers();
 pintarAgenda();
 pintarTareasProg();
-if(GOOGLE_SHEETS_WEB_APP_URL && document.getElementById('sheetsUrlInput')){
-  document.getElementById('sheetsUrlInput').value = GOOGLE_SHEETS_WEB_APP_URL;
-}
 
 // Registro del Service Worker (solo funciona si la app está hospedada en
 // una URL https, como GitHub Pages — si se abre el archivo directo desde
