@@ -617,11 +617,6 @@
       <h2>Resumen por cama</h2>
       <div id="mapaResumen"></div>
     </div>
-
-    <div class="card">
-      <h2>Descripción de columnas</h2>
-      <div id="colDescList"></div>
-    </div>
   </div>
 
   <!-- Modal: detalle de cama -->
@@ -1875,7 +1870,6 @@ function pintarMapa(){
   ).join('');
 
   pintarResumenMapa();
-  pintarColDesc();
 }
 
 let camaModalCodigo = null;
@@ -2441,14 +2435,6 @@ function iniciarSincronizacionFirebase(){
       if(el && document.activeElement !== el) el.value = notasLibres;
     }
   });
-
-  fsEscucharConfig('descripcionColumnas', valor => {
-    if(valor && typeof valor === 'object'){
-      descripcionColumnas = valor;
-      if(document.getElementById('colDescList') && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.col) return;
-      if(document.getElementById('colDescList')) pintarColDesc();
-    }
-  });
 }
 
 actualizarBadgeConexion();
@@ -2649,17 +2635,6 @@ function aplicarVisibilidadRoles(){
 // ---------- MAPEO: descripción de columnas ----------
 let descripcionColumnas = {};
 COLUMNAS.forEach(col => { descripcionColumnas[col.letra] = ''; });
-function pintarColDesc(){
-  const cont = document.getElementById('colDescList');
-  cont.innerHTML = COLUMNAS.map(col => `
-    <label>Columna ${col.letra}</label>
-    <textarea data-col="${col.letra}" oninput="guardarDescColumna(this)" placeholder="Descripción de la columna ${col.letra}...">${escapeHtml(descripcionColumnas[col.letra] || '')}</textarea>
-  `).join('');
-}
-function guardarDescColumna(el){
-  descripcionColumnas[el.dataset.col] = el.value;
-  fsGuardarConfig('descripcionColumnas', descripcionColumnas, 800);
-}
 
 // ---------- AGENDA DE EVENTOS ----------
 let eventos = [];
