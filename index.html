@@ -954,7 +954,7 @@ pintarTareaGrid();
 const CAMPOS_CONFIG = {
   'Riego': [
     { id:'riegoTiempo', label:'Tiempo de riego (minutos)', type:'number', placeholder:'Ej. 20' },
-    { id:'riegoCamas', label:'Camas regadas', type:'camas' }
+    { id:'riegoCamas', label:'Camas regadas', type:'columnas' }
   ],
   'Fertilización': [
     { id:'fertMetodo', label:'Método', type:'toggle2', options:['Foliar','Fertiriego'] },
@@ -1132,6 +1132,13 @@ function renderCampos(tipo){
           html += `<label class="chk-row"><input type="checkbox" class="${f.id}_item" value="${c}"><span>${c}</span></label>`;
         });
         html += `</div>`;
+      } else if(f.type === 'columnas'){
+        html += `<div class="camas-chk">`;
+        html += `<label class="chk-row"><input type="checkbox" id="${f.id}_todo"><span><b>Todo el invernadero</b></span></label>`;
+        COLUMNAS.forEach(col => {
+          html += `<label class="chk-row"><input type="checkbox" class="${f.id}_item" value="${col.letra}"><span>${col.letra}</span></label>`;
+        });
+        html += `</div>`;
       } else if(f.type === 'zona'){
         html += `<select id="${f.id}"><option value="Todo el invernadero">Todo el invernadero</option>` + COLUMNAS.map(c=>`<option value="${c.letra}">${c.letra}</option>`).join('') + `</select>`;
       } else if(f.type === 'camaSingle'){
@@ -1156,7 +1163,7 @@ function renderCampos(tipo){
     crearFilaInsumo(f.id, null);
   });
 
-  fields.filter(f=>f.type==='camas').forEach(f => {
+  fields.filter(f=>f.type==='camas' || f.type==='columnas').forEach(f => {
     const master = document.getElementById(f.id + '_todo');
     const items = () => document.querySelectorAll('.' + f.id + '_item');
     master.onchange = () => { items().forEach(cb => cb.checked = master.checked); };
@@ -1189,7 +1196,7 @@ function collectCampos(tipo){
         dosis: row.querySelector('.insumo-dosis').value
       })).filter(x => x.nombre || x.dosis);
     }
-    else if(f.type === 'camas'){
+    else if(f.type === 'camas' || f.type === 'columnas'){
       data[f.id] = [...document.querySelectorAll('.'+f.id+'_item:checked')].map(cb => cb.value);
     }
     else data[f.id] = document.getElementById(f.id).value;
@@ -1530,6 +1537,11 @@ function rellenarCampos(r){
       document.querySelectorAll('.'+f.id+'_item').forEach(cb => { cb.checked = seleccion.includes(cb.value); });
       const master = document.getElementById(f.id + '_todo');
       if(master) master.checked = seleccion.length === CAMAS.length;
+    } else if(f.type === 'columnas'){
+      const seleccion = r[f.id] || [];
+      document.querySelectorAll('.'+f.id+'_item').forEach(cb => { cb.checked = seleccion.includes(cb.value); });
+      const master = document.getElementById(f.id + '_todo');
+      if(master) master.checked = seleccion.length === COLUMNAS.length;
     } else {
       document.getElementById(f.id).value = r[f.id] || '';
     }
@@ -1548,12 +1560,17 @@ function camasBadge(lista){
   return lista.length === CAMAS.length ? '📍 Todo el invernadero' : `📍 ${lista.join(', ')}`;
 }
 
+function columnasBadge(lista){
+  if(!lista || !lista.length) return null;
+  return lista.length === COLUMNAS.length ? '📍 Todo el invernadero' : `📍 Columna${lista.length>1?'s':''} ${lista.join(', ')}`;
+}
+
 function badgesHTML(r){
   const b = [];
   switch(r.tipoTarea){
     case 'Riego':
       if(r.riegoTiempo) b.push(`⏱ ${r.riegoTiempo} min`);
-      if(camasBadge(r.riegoCamas)) b.push(camasBadge(r.riegoCamas));
+      if(columnasBadge(r.riegoCamas)) b.push(columnasBadge(r.riegoCamas));
       break;
     case 'Fertilización':
       if(r.fertMetodo) b.push(`🌾 ${r.fertMetodo}`);
