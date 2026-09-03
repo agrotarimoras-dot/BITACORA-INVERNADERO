@@ -257,15 +257,16 @@
   .camas-chk .chk-row{ border-bottom:1px solid var(--linea); }
   .camas-chk .chk-row:last-child{ border-bottom:none; }
 
-  .mapa-col-header{ display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:6px; margin-bottom:6px; }
+  .mapa-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+  .mapa-col-header{ display:grid; grid-template-columns: repeat(13,50px); gap:5px; margin-bottom:6px; width:max-content; }
   .mapa-col-header div{
-    text-align:center; font-weight:800; font-size:13px; color:#fff;
+    text-align:center; font-weight:800; font-size:12px; color:#fff;
     padding:5px 0; border-radius:6px; min-width:0; box-sizing:border-box;
   }
-  .mapa-grid{ display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:6px; margin-bottom:14px; }
+  .mapa-grid{ display:grid; grid-template-columns: repeat(13,50px); grid-auto-rows:50px; gap:5px; margin-bottom:14px; width:max-content; }
   .mapa-cell{
-    aspect-ratio:1; border-radius:8px; display:flex; align-items:center; justify-content:center;
-    font-weight:700; font-size:13px; position:relative;
+    border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:12px; position:relative;
     border: 3px solid transparent; min-width:0; box-sizing:border-box;
   }
   .mapa-cell.alerta::after{
@@ -274,6 +275,15 @@
   .mapa-leyenda{ display:flex; flex-wrap:wrap; gap:8px 14px; }
   .mapa-leyenda-item{ display:flex; align-items:center; gap:5px; font-size:11.5px; color:#6b6350; }
   .mapa-leyenda-dot{ width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+  .cama-vista{ display:flex; flex-direction:column; gap:2px; margin-bottom:16px; }
+  .cama-vista-row{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:11px 2px; border-bottom:1px solid var(--crema-2);
+  }
+  .cama-vista-row:last-child{ border-bottom:none; }
+  .cama-vista-etiqueta{ font-size:12.5px; color:#8a8270; font-weight:600; }
+  .cama-vista-valor{ font-size:14px; font-weight:700; color:var(--tinta); text-align:right; display:flex; align-items:center; gap:6px; }
+  .cama-vista-editar{ width:100%; }
   .resumen-row{
     display:flex; justify-content:space-between; align-items:center; gap:8px;
     padding: 9px 4px; border-bottom: 1px solid var(--crema-2); font-size:13px;
@@ -595,9 +605,11 @@
   <div class="tab-panel" id="tab-mapeo">
     <div class="card">
       <h2>Plano del invernadero</h2>
-      <p style="font-size:12px; color:#8a8270; margin:-6px 0 12px;">Toca una cama para ver su detalle.</p>
-      <div class="mapa-col-header" id="mapaColHeader"></div>
-      <div class="mapa-grid" id="mapaGrid"></div>
+      <p style="font-size:12px; color:#8a8270; margin:-6px 0 12px;">Toca una cama para ver su detalle. Desliza hacia los lados para ver las 13 columnas.</p>
+      <div class="mapa-scroll">
+        <div class="mapa-col-header" id="mapaColHeader"></div>
+        <div class="mapa-grid" id="mapaGrid"></div>
+      </div>
       <div class="mapa-leyenda" id="mapaLeyenda"></div>
     </div>
 
@@ -629,6 +641,8 @@
       <h2 id="invTitulo">Agregar insumo</h2>
       <label>Nombre del producto / insumo</label>
       <input type="text" id="invNombre" placeholder="Ej. Nitrato de calcio">
+      <label>Ingrediente activo</label>
+      <input type="text" id="invIngredienteActivo" placeholder="Ej. Azufre, Captan, Ácido fosfórico...">
       <label>Categoría / para qué sirve</label>
       <input type="text" id="invCategoria" placeholder="Ej. Fertilizante, fungicida, insecticida...">
       <div class="row2">
@@ -940,7 +954,7 @@ pintarTareaGrid();
 const CAMPOS_CONFIG = {
   'Riego': [
     { id:'riegoTiempo', label:'Tiempo de riego (minutos)', type:'number', placeholder:'Ej. 20' },
-    { id:'riegoZona', label:'Zona regada', type:'zona' }
+    { id:'riegoCamas', label:'Camas regadas', type:'camas' }
   ],
   'Fertilización': [
     { id:'fertMetodo', label:'Método', type:'toggle2', options:['Foliar','Fertiriego'] },
@@ -1006,16 +1020,20 @@ let otroSubtipo = null;
 let otroValores = {}; // valores capturados dentro del submenú de Otro
 
 // ---------- MAPEO: camas y etapas ----------
-const COLUMNAS = [
-  { letra:'A', color:'#3D7EA6' },
-  { letra:'B', color:'#B9812E' },
-  { letra:'C', color:'#5B8C3E' },
-  { letra:'D', color:'#A0478C' }
-];
-const CAMAS = []; // orden por letra, para selects y resumen: A1,A2,A3,B1,B2,B3...
-COLUMNAS.forEach(col => { for(let n=1;n<=3;n++) CAMAS.push(col.letra+n); });
-const CAMAS_GRID = []; // orden visual por fila (número), para que cada columna quede con su letra: A1,B1,C1,D1,A2,B2,C2,D2...
-for(let n=1;n<=3;n++){ COLUMNAS.forEach(col => CAMAS_GRID.push(col.letra+n)); }
+// 13 columnas numeradas (1 a 13), cada una dividida en 3 secciones: a, b, c
+// (ej. 1a, 1b, 1c, 2a, 2b, 2c... hasta 13c).
+const SUBDIVISIONES = ['a','b','c'];
+function colorColumna(i){
+  // Genera 13 colores distintos y consistentes, en tonos que combinan con la app.
+  const hue = Math.round((i * 360) / 13);
+  return `hsl(${hue}, 42%, 44%)`;
+}
+const COLUMNAS = [];
+for(let n=1; n<=13; n++){ COLUMNAS.push({ letra: String(n), color: colorColumna(n-1) }); }
+const CAMAS = []; // orden: 1a,1b,1c,2a,2b,2c...13a,13b,13c
+COLUMNAS.forEach(col => { SUBDIVISIONES.forEach(sub => CAMAS.push(col.letra+sub)); });
+const CAMAS_GRID = []; // orden visual: fila a (1a,2a,...13a), fila b, fila c
+SUBDIVISIONES.forEach(sub => { COLUMNAS.forEach(col => CAMAS_GRID.push(col.letra+sub)); });
 const ETAPAS = [
   { nombre:'Preparación',        color:'#C9C4B4', text:'#4a4636' },
   { nombre:'Plántula',           color:'#B9D98E', text:'#2f4a1f' },
@@ -1422,6 +1440,33 @@ function agregarRegistro(){
     return;
   }
 
+  // Riego con varias camas seleccionadas: se guarda como una actividad
+  // separada por cada cama (mismo tiempo/notas, pero cada una queda como
+  // su propio renglón en el historial, en vez de una sola entrada con
+  // todas las camas juntas).
+  if(tipoTareaSeleccionada === 'Riego' && Array.isArray(camposData.riegoCamas) && camposData.riegoCamas.length > 1){
+    const ahoraR = new Date();
+    const fechaR = ahoraR.toLocaleDateString('es-MX');
+    const horaR = ahoraR.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+    const usuarioR = currentUser ? currentUser.nombre : (usuarioActivoNombre || 'Usuario 1');
+    camposData.riegoCamas.forEach(cama => {
+      const reg = {
+        id: generarId(),
+        creado: Date.now(),
+        fecha: fechaR, hora: horaR, usuario: usuarioR,
+        tipoTarea: tipoTareaSeleccionada,
+        notas,
+        riegoTiempo: camposData.riegoTiempo,
+        riegoCamas: [cama]
+      };
+      registros.unshift(reg);
+      fsGuardarItem('registros', reg);
+    });
+    resetFormulario();
+    cambiarTab('historial');
+    return;
+  }
+
   const ahora = new Date();
   const reg = Object.assign({
     id: generarId(),
@@ -1508,7 +1553,7 @@ function badgesHTML(r){
   switch(r.tipoTarea){
     case 'Riego':
       if(r.riegoTiempo) b.push(`⏱ ${r.riegoTiempo} min`);
-      if(r.riegoZona) b.push(`📍 ${r.riegoZona}`);
+      if(camasBadge(r.riegoCamas)) b.push(camasBadge(r.riegoCamas));
       break;
     case 'Fertilización':
       if(r.fertMetodo) b.push(`🌾 ${r.fertMetodo}`);
@@ -1797,7 +1842,7 @@ function pintarMapa(){
   CAMAS_GRID.forEach(codigo => {
     const d = camasData[codigo];
     const info = etapaInfo(d.etapa);
-    const columna = COLUMNAS.find(col => col.letra === codigo[0]);
+    const columna = COLUMNAS.find(col => codigo.startsWith(col.letra) && SUBDIVISIONES.includes(codigo.slice(col.letra.length)));
     const cell = document.createElement('div');
     cell.className = 'mapa-cell' + (d.alerta ? ' alerta' : '');
     cell.style.background = info.color;
@@ -1820,8 +1865,45 @@ let camaModalCodigo = null;
 
 function abrirCamaModal(codigo){
   camaModalCodigo = codigo;
+  pintarCamaModalVista();
+  document.getElementById('camaModalOverlay').classList.remove('hidden');
+}
+
+// Vista de SOLO LECTURA: muestra los datos de la cama y un ícono de lápiz
+// para pasar al modo edición.
+function pintarCamaModalVista(){
+  const codigo = camaModalCodigo;
   const d = camasData[codigo];
+  const info = etapaInfo(d.etapa);
   document.getElementById('camaModalTitulo').textContent = 'Cama ' + codigo;
+  document.getElementById('camaModalBody').innerHTML = `
+    <div class="cama-vista">
+      <div class="cama-vista-row">
+        <span class="cama-vista-etiqueta">Etapa de cultivo</span>
+        <span class="cama-vista-valor"><span class="mapa-leyenda-dot" style="background:${info.color}"></span>${escapeHtml(d.etapa || 'Sin especificar')}</span>
+      </div>
+      <div class="cama-vista-row">
+        <span class="cama-vista-etiqueta">Variedad</span>
+        <span class="cama-vista-valor">${escapeHtml(d.variedad || '—')}</span>
+      </div>
+      <div class="cama-vista-row">
+        <span class="cama-vista-etiqueta">Estado actual</span>
+        <span class="cama-vista-valor">${escapeHtml(d.estadoActual || '—')}</span>
+      </div>
+      <div class="cama-vista-row">
+        <span class="cama-vista-etiqueta">Alertas activas</span>
+        <span class="cama-vista-valor" style="${d.alerta ? 'color:#A81F3A; font-weight:700;' : ''}">${escapeHtml(d.alerta || 'Sin alertas')}</span>
+      </div>
+    </div>
+    <button class="btn-secondary cama-vista-editar" onclick="pintarCamaModalEditar()">✏️ Editar datos de esta cama</button>
+  `;
+}
+
+// Vista de EDICIÓN: se abre solo al tocar el ícono de lápiz.
+function pintarCamaModalEditar(){
+  const codigo = camaModalCodigo;
+  const d = camasData[codigo];
+  document.getElementById('camaModalTitulo').textContent = 'Editar cama ' + codigo;
   document.getElementById('camaModalBody').innerHTML = `
     <label>Código</label>
     <input type="text" value="${codigo}" disabled style="background:var(--crema-2); color:#8a8270;">
@@ -1833,9 +1915,11 @@ function abrirCamaModal(codigo){
     <select id="camaModalEtapa">${ETAPAS.map(e => `<option value="${e.nombre}" ${e.nombre===d.etapa?'selected':''}>${e.nombre}</option>`).join('')}</select>
     <label>Alertas activas</label>
     <input type="text" id="camaModalAlerta" placeholder="Ej. Sin alertas" value="${escapeHtml(d.alerta || '')}">
-    <button class="btn-primary" onclick="guardarCamaModal()">Guardar cambios</button>
+    <div style="display:flex; gap:8px; margin-top:4px;">
+      <button class="btn-secondary" style="flex:1;" onclick="pintarCamaModalVista()">Cancelar</button>
+      <button class="btn-primary" style="flex:1;" onclick="guardarCamaModal()">Guardar cambios</button>
+    </div>
   `;
-  document.getElementById('camaModalOverlay').classList.remove('hidden');
 }
 
 function guardarCamaModal(){
@@ -1845,8 +1929,8 @@ function guardarCamaModal(){
   camasData[camaModalCodigo].etapa = document.getElementById('camaModalEtapa').value;
   camasData[camaModalCodigo].alerta = document.getElementById('camaModalAlerta').value;
   fsGuardarConfig('camas', camasData);
-  cerrarCamaModal();
   pintarMapa();
+  pintarCamaModalVista();
 }
 
 function cerrarCamaModal(){
@@ -1872,7 +1956,11 @@ function guardarInsumo(){
   if(!nombre){ alert('Escribe el nombre del insumo.'); return; }
   const datos = {
     nombre,
+    ingredienteActivo: document.getElementById('invIngredienteActivo').value,
     categoria: document.getElementById('invCategoria').value,
+    tipoProblema: document.getElementById('invTipoProblema').value,
+    subcategoria: document.getElementById('invSubcategoria').value,
+    estado: document.getElementById('invEstado').value,
     evaluacion: document.getElementById('invEvaluacion').value,
     dosisRecomendada: document.getElementById('invDosisRecom').value,
     dosisAplicada: document.getElementById('invDosisAplicada').value,
@@ -1893,11 +1981,13 @@ function guardarInsumo(){
   fsGuardarItem('inventario', insumo);
   cancelarEdicionInsumo();
   pintarInventario();
+  buscarFitosanitario();
 }
 
 function limpiarFormInsumo(){
-  ['invNombre','invCategoria','invEvaluacion','invDosisRecom','invDosisAplicada','invUnidad','invPrecio','invProveedor'].forEach(id => {
-    document.getElementById(id).value = '';
+  ['invNombre','invIngredienteActivo','invCategoria','invTipoProblema','invSubcategoria','invEstado','invEvaluacion','invDosisRecom','invDosisAplicada','invUnidad','invPrecio','invProveedor'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
   });
 }
 
@@ -1905,7 +1995,11 @@ function editarInsumo(id){
   const i = inventario.find(x => x.id === id);
   if(!i) return;
   document.getElementById('invNombre').value = i.nombre || '';
+  document.getElementById('invIngredienteActivo').value = i.ingredienteActivo || '';
   document.getElementById('invCategoria').value = i.categoria || '';
+  document.getElementById('invTipoProblema').value = i.tipoProblema || '';
+  document.getElementById('invSubcategoria').value = i.subcategoria || '';
+  document.getElementById('invEstado').value = i.estado || 'En bodega';
   document.getElementById('invEvaluacion').value = i.evaluacion || '';
   document.getElementById('invDosisRecom').value = i.dosisRecomendada || '';
   document.getElementById('invDosisAplicada').value = i.dosisAplicada || '';
@@ -1948,7 +2042,7 @@ function pintarInventario(){
       <div class="entry-top">
         <div>
           <div class="entry-title">${escapeHtml(i.nombre)}</div>
-          <div class="entry-meta">${escapeHtml(i.categoria || 'Sin categoría')}</div>
+          <div class="entry-meta">${i.ingredienteActivo ? '🧬 '+escapeHtml(i.ingredienteActivo)+' · ' : ''}${escapeHtml(i.categoria || 'Sin categoría')}</div>
         </div>
         <div class="entry-actions">
           <button class="btn-ghost edit" onclick="editarInsumo('${i.id}')">Editar</button>
@@ -1967,8 +2061,8 @@ function pintarInventario(){
 }
 
 function exportarInventarioCSV(){
-  const headers = ['Nombre','Categoria','Evaluacion','Dosis recomendada','Dosis aplicada','Unidad','Precio','Proveedor'];
-  const rows = inventario.map(i => [i.nombre, i.categoria, i.evaluacion, i.dosisRecomendada, i.dosisAplicada, i.unidad, i.precio, i.proveedor]);
+  const headers = ['Nombre','Ingrediente activo','Categoria','Tipo de problema','Subcategoria','Disponibilidad','Evaluacion','Dosis recomendada','Dosis aplicada','Unidad','Precio','Proveedor'];
+  const rows = inventario.map(i => [i.nombre, i.ingredienteActivo, i.categoria, i.tipoProblema, i.subcategoria, i.estado, i.evaluacion, i.dosisRecomendada, i.dosisAplicada, i.unidad, i.precio, i.proveedor]);
   let csv = '\uFEFF' + headers.map(csvEscape).join(',') + '\n';
   rows.forEach(row => { csv += row.map(csvEscape).join(',') + '\n'; });
   const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
@@ -2060,7 +2154,7 @@ function strToCamas(str){ return str ? str.split(';').filter(Boolean) : []; }
 function exportarCSV(){
   const headers = [
     'Id','Fecha','Hora','Usuario','Tipo de tarea',
-    'Riego - Tiempo (min)','Riego - Zona',
+    'Riego - Tiempo (min)','Riego - Camas',
     'Fertilizacion - Metodo','Fertilizacion - Insumos','Fertilizacion - Zona',
     'Plagas - Nombre','Plagas - Metodo','Plagas - Insumos','Plagas - Camas','Plagas - Cama Alerta',
     'Poda - Tipo','Poda - Camas',
@@ -2072,7 +2166,7 @@ function exportarCSV(){
   ];
   const rows = registros.map(r => [
     r.id || '', r.fecha, r.hora, r.usuario, r.tipoTarea,
-    r.riegoTiempo || '', r.riegoZona || '',
+    r.riegoTiempo || '', camasToStr(r.riegoCamas),
     r.fertMetodo || '', insumosToStr(r.fertInsumos), r.fertZona || '',
     r.plagasNombre || '', r.plagasMetodo || '', insumosToStr(r.plagasInsumos), camasToStr(r.plagasCamas), r.plagasCamaAlerta || '',
     r.podaTipo || '', camasToStr(r.podaCamas),
@@ -2132,7 +2226,7 @@ function importarCSV(event){
       if(c.length < 37) continue;
       nuevos.push({
         id: c[0] || generarId(), fecha: c[1], hora: c[2], usuario: c[3], tipoTarea: c[4],
-        riegoTiempo: c[5], riegoZona: c[6],
+        riegoTiempo: c[5], riegoCamas: strToCamas(c[6]),
         fertMetodo: c[7], fertInsumos: strToInsumos(c[8]), fertZona: c[9],
         plagasNombre: c[10], plagasMetodo: c[11], plagasInsumos: strToInsumos(c[12]), plagasCamas: strToCamas(c[13]), plagasCamaAlerta: c[14],
         podaTipo: c[15], podaCamas: strToCamas(c[16]),
@@ -2536,7 +2630,8 @@ function aplicarVisibilidadRoles(){
 }
 
 // ---------- MAPEO: descripción de columnas ----------
-let descripcionColumnas = { A:'', B:'', C:'', D:'' };
+let descripcionColumnas = {};
+COLUMNAS.forEach(col => { descripcionColumnas[col.letra] = ''; });
 function pintarColDesc(){
   const cont = document.getElementById('colDescList');
   cont.innerHTML = COLUMNAS.map(col => `
@@ -3138,10 +3233,13 @@ function buscarFitosanitario(){
   if(!cont) return;
   const tipo = document.getElementById('buscadorTipo').value;
   const texto = document.getElementById('buscadorTexto').value.trim().toLowerCase();
-  let resultados = inventario.filter(i => i.tipoProblema);
+  let resultados = inventario.slice();
   if(tipo) resultados = resultados.filter(i => i.tipoProblema === tipo);
   if(texto) resultados = resultados.filter(i =>
-    (i.subcategoria||'').toLowerCase().includes(texto) || (i.nombre||'').toLowerCase().includes(texto)
+    (i.nombre||'').toLowerCase().includes(texto) ||
+    (i.ingredienteActivo||'').toLowerCase().includes(texto) ||
+    (i.categoria||'').toLowerCase().includes(texto) ||
+    (i.subcategoria||'').toLowerCase().includes(texto)
   );
   if(!tipo && !texto){ cont.innerHTML = '<div class="empty" style="padding:14px 4px;">Filtra por tipo de problema o escribe una palabra clave.</div>'; return; }
   if(resultados.length === 0){ cont.innerHTML = '<div class="empty" style="padding:14px 4px;">Sin resultados.</div>'; return; }
@@ -3150,7 +3248,7 @@ function buscarFitosanitario(){
     return `
     <div class="buscador-resultado">
       <div class="entry-title">${escapeHtml(i.nombre)}</div>
-      <div class="entry-meta">${escapeHtml(i.tipoProblema||'')}${i.subcategoria ? ' · '+escapeHtml(i.subcategoria) : ''}</div>
+      <div class="entry-meta">${i.ingredienteActivo ? '🧬 '+escapeHtml(i.ingredienteActivo)+' · ' : ''}${escapeHtml(i.tipoProblema||i.categoria||'')}${i.subcategoria ? ' · '+escapeHtml(i.subcategoria) : ''}</div>
       <div style="margin-top:6px;">
         <span class="stock-tag" style="color:${enBodega ? '#2F8F72' : '#A81F3A'};">${enBodega ? '🟢 En bodega' : '🔴 Sin stock / por comprar'}</span>
       </div>
