@@ -592,6 +592,10 @@
         <button class="modal-close" onclick="cerrarDiaModal()">✕</button>
       </div>
       <div class="modal-body">
+        <label class="chk-row" style="justify-content:space-between; background:var(--crema-2); border-radius:10px; padding:10px 12px; margin-bottom:14px;">
+          <span style="display:flex; align-items:center; gap:8px; font-weight:700;">💧 Agua Toma</span>
+          <input type="checkbox" id="diaModalAgua" onchange="toggleDiaAgua()">
+        </label>
         <div class="modal-section-title">✅ Actividades realizadas</div>
         <div id="diaModalRegistros"></div>
         <div class="modal-section-title">🗓️ Agendado para este día</div>
@@ -631,6 +635,18 @@
 
   <!-- TAB: INVENTARIO -->
   <div class="tab-panel" id="tab-inventario">
+    <div class="card">
+      <h2>📥 Catálogo del proveedor</h2>
+      <p style="font-size:12px; color:#8a8270; margin:-4px 0 10px; line-height:1.4;">102 productos con su ficha técnica (composición, dosis, presentación). Se agregan como "Sin stock / por comprar" — luego marcas cuáles sí tienes.</p>
+      <button class="btn-secondary" onclick="importarCatalogoProveedor()">Importar catálogo completo</button>
+    </div>
+
+    <div class="card">
+      <h2>📥 Catálogo ANSA (ansa.ag)</h2>
+      <p style="font-size:12px; color:#8a8270; margin:-4px 0 10px; line-height:1.4;">51 productos relevantes para fresa, filtrados de su catálogo público (500+). No trae dosis exacta — revisa ficha técnica antes de aplicar.</p>
+      <button class="btn-secondary" onclick="importarCatalogoAnsa()">Importar catálogo ANSA</button>
+    </div>
+
     <div class="card">
       <h2 id="invTitulo">Agregar insumo</h2>
       <label>Nombre del producto / insumo</label>
@@ -734,6 +750,57 @@
     <div class="card">
       <h2>Notas libres</h2>
       <textarea id="notasLibresArea" style="min-height:240px;" placeholder="Escribe aquí cualquier nota, idea o pendiente general..." oninput="guardarNotasLibres()"></textarea>
+    </div>
+  </div>
+
+  <!-- TAB: PROGRAMA DE ALIMENTACIÓN -->
+  <div class="tab-panel" id="tab-alimentacion">
+    <div class="card">
+      <div class="userpicker" id="alimSubNav"></div>
+    </div>
+
+    <div id="alimSubPrograma">
+      <div class="card">
+        <h2 id="alimTitulo">Agregar línea al programa</h2>
+        <label>Etapa del cultivo</label>
+        <select id="alimEtapa"></select>
+        <label>Semana desde</label>
+        <input type="number" id="alimSemanaDesde" placeholder="Ej. 1" min="0">
+        <label>Semana hasta</label>
+        <input type="number" id="alimSemanaHasta" placeholder="Ej. 2 (déjalo igual si es solo una semana)" min="0">
+        <label>Producto / fertilizante</label>
+        <input type="text" id="alimProducto" placeholder="Ej. Nitrato de calcio">
+        <label>Dosis</label>
+        <input type="text" id="alimDosis" placeholder="Ej. 2 g/L">
+        <label>Frecuencia</label>
+        <input type="text" id="alimFrecuencia" placeholder="Ej. Cada 3 días">
+        <label>Notas</label>
+        <textarea id="alimNotas" placeholder="Cualquier detalle extra..."></textarea>
+        <button class="btn-primary" id="btnGuardarAlim" onclick="guardarPlanAlimentacion()">Agregar al programa</button>
+        <button class="btn-secondary hidden" id="btnCancelarAlim" onclick="cancelarEdicionPlanAlimentacion()">Cancelar edición</button>
+      </div>
+
+      <div class="card">
+        <h2>Programa completo</h2>
+        <p style="font-size:12px; color:#8a8270; margin:-6px 0 12px;">Ordenado por etapa y semana.</p>
+        <div id="listaAlimentacion"></div>
+      </div>
+    </div>
+
+    <div id="alimSubPlanAnual" class="hidden">
+      <div class="card">
+        <h2>Plan de 12 meses — solo como guía</h2>
+        <p style="font-size:12px; color:#8a8270; margin:-4px 0 10px; line-height:1.4;">
+          Curva de desarrollo y nutrición orientativa para <b>Victor</b> (día corto), <b>Golden Gate</b> (día neutro, trasplante noviembre) y <b>Eclipse</b> (día neutro, planta de verano).
+          Las fechas exactas se pueden correr 2-3 semanas según el clima real dentro de tu invernadero — ajusta con tus propios registros.
+        </p>
+        <button class="btn-secondary" onclick="agregarTodosEventosPlanAnual()">📅 Agregar los 12 recordatorios a mi Agenda</button>
+      </div>
+      <div id="listaPlanAnual"></div>
+    </div>
+
+    <div id="alimSubVariedades" class="hidden">
+      <div id="listaVariedades"></div>
     </div>
   </div>
 
@@ -890,6 +957,10 @@
   <button id="navNotas" onclick="cambiarTab('notas')">
     <span class="ic">📝</span>Notas
   </button>
+  <button id="navAlimentacion" onclick="cambiarTab('alimentacion')">
+    <span class="ic">🌱</span>Alimentación
+  </button>
+
   <button id="navBalance" class="hidden" onclick="cambiarTab('balance')">
     <span class="ic">📊</span>Balance
   </button>
@@ -1037,6 +1108,7 @@ const ETAPAS = [
 ];
 let camasData = {};
 CAMAS.forEach(c => { camasData[c] = { etapa:'Preparación', alerta:'', variedad:'', estadoActual:'' }; });
+let planAlimentacion = [];
 
 // ---------- INVENTARIO ----------
 let inventario = [];
@@ -1373,8 +1445,8 @@ pintarUserPicker();
 
 function cambiarTab(t){
   if(t === 'balance' && (!currentUser || currentUser.rol !== 'admin')) return;
-  const tabs = ['nuevo','calendario','mapeo','inventario','notas','balance','historial'];
-  const navIds = { nuevo:'navNuevo', calendario:'navCalendario', mapeo:'navMapeo', inventario:'navInventario', notas:'navNotas', balance:'navBalance', historial:'navHistorial' };
+  const tabs = ['nuevo','calendario','mapeo','inventario','notas','alimentacion','balance','historial'];
+  const navIds = { nuevo:'navNuevo', calendario:'navCalendario', mapeo:'navMapeo', inventario:'navInventario', notas:'navNotas', alimentacion:'navAlimentacion', balance:'navBalance', historial:'navHistorial' };
   tabs.forEach(tab => {
     document.getElementById('tab-'+tab).classList.toggle('active', t===tab);
     document.getElementById(navIds[tab]).classList.toggle('active', t===tab);
@@ -1385,6 +1457,7 @@ function cambiarTab(t){
   if(t==='mapeo'){ pintarMapa(); }
   if(t==='inventario'){ pintarInventario(); pintarProveedores(); buscarFitosanitario(); }
   if(t==='notas') pintarAvisos();
+  if(t==='alimentacion') cambiarAlimSub(alimSubActual);
   if(t==='balance') cambiarBalanceSub(balanceSubActual);
 }
 
@@ -1738,7 +1811,9 @@ function pintarCalendario(){
     el.className = 'cal-day';
     if(mismoDia(fechaDia, hoy)) el.classList.add('today');
     if(diaSeleccionado && mismoDia(fechaDia, diaSeleccionado)) el.classList.add('selected');
-    el.innerHTML = `${dia}${climaIconos ? `<div style="font-size:9px;">${climaIconos}</div>` : ''}<div class="cal-dots">${colores.map(c => `<span style="background:${c}"></span>`).join('')}</div>`;
+    const tieneAgua = !!diasAgua[claveDia(fechaDia)];
+    if(tieneAgua) el.style.position = 'relative';
+    el.innerHTML = `${dia}${climaIconos ? `<div style="font-size:9px;">${climaIconos}</div>` : ''}<div class="cal-dots">${colores.map(c => `<span style="background:${c}"></span>`).join('')}</div>${tieneAgua ? '<span style="position:absolute; top:1px; right:2px; font-size:10px;">💧</span>' : ''}`;
     el.onclick = () => { diaSeleccionado = fechaDia; pintarCalendario(); abrirDiaModal(fechaDia); };
     grid.appendChild(el);
   }
@@ -1798,6 +1873,8 @@ function abrirDiaModal(fechaRef){
       </div>
     `).join('');
   }
+
+  document.getElementById('diaModalAgua').checked = !!diasAgua[claveDia(fechaRef)];
 
   document.getElementById('diaModalOverlay').classList.remove('hidden');
 }
@@ -2104,6 +2181,24 @@ function exportarInventarioCSV(){
 // ---------- NOTAS ----------
 let avisos = [];
 let notasLibres = '';
+let diasAgua = {}; // { 'YYYY-MM-DD': true }
+
+function claveDia(fecha){
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth()+1).padStart(2,'0');
+  const d = String(fecha.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+
+function toggleDiaAgua(){
+  if(!diaSeleccionado) return;
+  const clave = claveDia(diaSeleccionado);
+  const activo = document.getElementById('diaModalAgua').checked;
+  if(activo) diasAgua[clave] = true;
+  else delete diasAgua[clave];
+  fsGuardarConfig('diasAgua', diasAgua, 0);
+  pintarCalendario();
+}
 
 function agregarAviso(){
   const input = document.getElementById('avisoInput');
@@ -2437,6 +2532,11 @@ function iniciarSincronizacionFirebase(){
     pintarProveedores();
   });
 
+  fsEscucharColeccion('planAlimentacion', items => {
+    planAlimentacion = items;
+    if(document.getElementById('tab-alimentacion')) pintarPlanAlimentacion();
+  });
+
   fsEscucharConfig('camas', valor => {
     if(valor && typeof valor === 'object'){
       CAMAS.forEach(c => { if(valor[c]) camasData[c] = valor[c]; });
@@ -2449,6 +2549,16 @@ function iniciarSincronizacionFirebase(){
       notasLibres = valor;
       const el = document.getElementById('notasLibresArea');
       if(el && document.activeElement !== el) el.value = notasLibres;
+    }
+  });
+
+  fsEscucharConfig('diasAgua', valor => {
+    if(valor && typeof valor === 'object'){
+      diasAgua = valor;
+      pintarCalendario();
+      if(diaSeleccionado && document.getElementById('diaModalAgua') && !document.getElementById('diaModalOverlay').classList.contains('hidden')){
+        document.getElementById('diaModalAgua').checked = !!diasAgua[claveDia(diaSeleccionado)];
+      }
     }
   });
 }
@@ -2501,7 +2611,8 @@ function exportarBackupJSON(){
     proveedores,
     descripcionColumnas,
     eventos,
-    tareasProgramadas
+    tareasProgramadas,
+    planAlimentacion
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
@@ -2561,6 +2672,7 @@ function importarBackupJSON(event){
     }
     eventos = asegurarIdsYSubir(Array.isArray(data.eventos) ? data.eventos : [], 'eventos');
     tareasProgramadas = asegurarIdsYSubir(Array.isArray(data.tareasProgramadas) ? data.tareasProgramadas : [], 'tareasProgramadas');
+    planAlimentacion = asegurarIdsYSubir(Array.isArray(data.planAlimentacion) ? data.planAlimentacion : [], 'planAlimentacion');
 
     pintarUserPicker();
     document.getElementById('notasLibresArea').value = notasLibres;
@@ -2576,6 +2688,7 @@ function importarBackupJSON(event){
     pintarSelectClientes();
     pintarProveedores();
     pintarTareasProg();
+    pintarPlanAlimentacion();
     alert('Respaldo restaurado y subido a la nube correctamente.');
     event.target.value = '';
   };
@@ -3246,6 +3359,668 @@ function pintarProveedores(){
   `).join('');
 }
 
+// ---------- SUB-NAVEGACIÓN DE ALIMENTACIÓN ----------
+let alimSubActual = 'programa';
+function pintarAlimSubNav(){
+  const cont = document.getElementById('alimSubNav');
+  if(!cont) return;
+  cont.innerHTML = '';
+  [{id:'programa', label:'Programa'}, {id:'planAnual', label:'Plan anual'}, {id:'variedades', label:'Variedades'}].forEach(s => {
+    const b = document.createElement('button');
+    b.textContent = s.label;
+    b.className = s.id === alimSubActual ? 'active' : '';
+    b.onclick = () => cambiarAlimSub(s.id);
+    cont.appendChild(b);
+  });
+}
+function cambiarAlimSub(sub){
+  alimSubActual = sub;
+  pintarAlimSubNav();
+  document.getElementById('alimSubPrograma').classList.toggle('hidden', sub !== 'programa');
+  document.getElementById('alimSubPlanAnual').classList.toggle('hidden', sub !== 'planAnual');
+  document.getElementById('alimSubVariedades').classList.toggle('hidden', sub !== 'variedades');
+  if(sub === 'programa') pintarPlanAlimentacion();
+  if(sub === 'planAnual') pintarPlanAnual();
+  if(sub === 'variedades') pintarVariedades();
+}
+
+// ---------- DESCRIPCIÓN DE VARIEDADES (referencia, no editable) ----------
+const VARIEDADES_INFO = [
+  {
+    nombre: 'Eclipse',
+    tipo: 'Día neutro (planta de verano)',
+    color: '#8E2A3B',
+    descripcion: 'Variedad de la generación 2024 de UC Davis, con una diferencia clave frente a Golden Gate: se planta en verano (no en noviembre) y está diseñada para rendir mejor en otoño-invierno — justo la ventana donde las demás variedades del invernadero producen menos. Resistente a Fusarium.',
+    destacados: ['Resistente a Fusarium', 'La más firme del grupo 2024 de UC Davis, con la mejor vida de anaquel', '54% más rendimiento que variedades comparables en su ventana de otoño-invierno', 'Es la pieza clave que evita que septiembre-octubre se queden en cero producción'],
+    arranque: 'Se planta en verano (jun-jul) y para septiembre ya está en plena producción — el arranque más rápido de las cuatro variedades del invernadero, sin la espera de establecimiento que sí tienen las de trasplante de noviembre.',
+    nutricion: 'Programa día-neutro estándar (Ca+B+Zn en floración/cuajado), con énfasis en K desde el trasplante de verano, ya que entra a producir casi de inmediato.',
+    columnas: '1 a la 3 (3 columnas)',
+    plantas: 1500,
+    kgPorPlanta: 0.7,
+    distribucion: [18,20,16,8,4,3,5,4,3,5,6,8]
+  },
+  {
+    nombre: 'Victor',
+    tipo: 'Día corto',
+    color: '#3D7EA6',
+    descripcion: 'Variedad del programa de la Universidad de California, Davis (misma generación que Moxie, Royal Royce, Valiant y Warrior). Al ser de día corto, la inducción floral depende del fotoperiodo: florece cuando los días se acortan por debajo de ~14 horas de luz (otoño-invierno), y entra en fase vegetativa/estolonífera cuando los días vuelven a alargar.',
+    destacados: ['Fruta grande y firme, con buena vida de anaquel', 'Buena resistencia confirmada a Fusarium y Phytophthora', 'Un ciclo de producción concentrado por temporada (no continuo todo el año)', 'A diferencia de las día-neutro, el clima frío de Calimaya le favorece (ayuda a la inducción floral) — solo cuidado con heladas reales bajo cero, que sí dañan fruta y flor'],
+    arranque: 'Arranque gradual: tras el trasplante de raíz certificada, la inducción floral se nota 4-6 semanas después, conforme los días se acortan — no es la más rápida, pero es predecible.',
+    nutricion: 'N moderado + P alto en inducción, K y Ca en aumento hacia floración, Boro+Zinc+Biozyme en floración y cuajado (ver el detalle completo en la pestaña Programa).',
+    columnas: '4 a la 8 (5 columnas)',
+    plantas: 2500,
+    kgPorPlanta: 0.6,
+    distribucion: [0,5,20,30,25,15,5,0,0,0,0,0]
+  },
+  {
+    nombre: 'Golden Gate',
+    tipo: 'Día neutro',
+    color: '#B9812E',
+    descripcion: 'Variedad de día neutro de la generación 2024 de UC Davis, resistente a Fusarium. Es de temporada temprana-media: arranca a producir más rápido tras el trasplante que otras día-neutro, con un pico más temprano en el ciclo — justo lo que ayuda a llenar el hueco de invierno.',
+    destacados: ['Resistente a Fusarium (marchitamiento)', 'Rinde igual o más que Royal Royce en pruebas de UC Davis', 'Pico de producción más temprano en el ciclo', 'Ajustado por altitud: aún con eso, dic-ene bajan por el frío nocturno de Calimaya'],
+    arranque: 'Arranque temprano-medio tras el trasplante de raíz desnuda de noviembre — de las día-neutro del invernadero, es la que antes repunta en pleno invierno.',
+    nutricion: 'Enraizador al trasplante (protocolo de raíz desnuda), luego programa día-neutro estándar con énfasis en P durante el primer mes y K en aumento hacia primavera.',
+    columnas: '11 a la 13 (3 columnas)',
+    plantas: 1500,
+    kgPorPlanta: 1.0,
+    distribucion: [0,0,0,1,6,12,16,16,13,8,14,14]
+  },
+  {
+    nombre: 'Albion',
+    tipo: 'Día neutro',
+    color: '#A63D5C',
+    descripcion: 'El clásico de la industria en variedades de día neutro — con fama de producción estable y buen sabor (referencia de dulzura en la industria). Se mantienen 2 columnas específicamente por el sabor, propagadas por estolón de una planta madre propia de 5 años (3a-4a generación).',
+    destacados: ['El mejor sabor del grupo — por eso se mantiene pese al rendimiento algo menor', '⚠️ Sin resistencia genética a Fusarium/Verticillium/Phytophthora — es la variedad de mayor riesgo sanitario del invernadero', '⚠️ Planta de 3a-4a generación por estolón: vigor reducido, más susceptible al estrés que una planta certificada nueva', 'Tratar como "variedad centinela": revisarla primero ante cualquier señal de plaga/enfermedad'],
+    arranque: 'El más lento y menos vigoroso de las cuatro, por venir de estolón de planta madre de varios años — requiere vigilancia reforzada desde el día uno (Trichoderma preventivo, monitoreo semanal).',
+    nutricion: 'Igual que las demás día-neutro, pero con Trichoderma harzianum preventivo en cada riego los primeros 60 días, y nitrógeno de arranque más bajo para no favorecer hongos/ácaros con follaje suculento en exceso.',
+    columnas: '9 a la 10 (2 columnas)',
+    plantas: 1000,
+    kgPorPlanta: 0.7,
+    distribucion: [0,0,0,1,5,9,11,12,11,10,16,25]
+  }
+];
+
+// Dibuja una ilustración simple (no es una foto real, es un dibujo propio
+// para que funcione sin internet) de una fresa en el tono de color
+// característico de cada variedad, a modo de imagen de referencia.
+function svgFresaVariedad(color){
+  return `<svg viewBox="0 0 100 100" width="72" height="72" style="flex-shrink:0;">
+    <path d="M50,32 C38,18 22,24 26,34 C16,30 8,42 18,46 C30,40 42,36 50,32 C58,36 70,40 82,46 C92,42 84,30 74,34 C78,24 62,18 50,32 Z" fill="#4C7A44"/>
+    <path d="M50,34 C28,34 16,52 22,70 C27,86 40,92 50,92 C60,92 73,86 78,70 C84,52 72,34 50,34 Z" fill="${color}"/>
+    <ellipse cx="38" cy="48" rx="7" ry="9" fill="#ffffff" opacity="0.18"/>
+    <g fill="#F5E6B8">
+      <ellipse cx="40" cy="52" rx="2.2" ry="3" transform="rotate(-20 40 52)"/>
+      <ellipse cx="56" cy="50" rx="2.2" ry="3" transform="rotate(15 56 50)"/>
+      <ellipse cx="34" cy="66" rx="2.2" ry="3" transform="rotate(-10 34 66)"/>
+      <ellipse cx="50" cy="64" rx="2.2" ry="3" transform="rotate(5 50 64)"/>
+      <ellipse cx="65" cy="64" rx="2.2" ry="3" transform="rotate(20 65 64)"/>
+      <ellipse cx="42" cy="80" rx="2.2" ry="3" transform="rotate(-15 42 80)"/>
+      <ellipse cx="58" cy="79" rx="2.2" ry="3" transform="rotate(10 58 79)"/>
+    </g>
+  </svg>`;
+}
+
+// Dibuja la mini gráfica de barras (SVG) con la perspectiva de producción
+// mensual estimada de una variedad. Es ilustrativa, basada en patrones
+// típicos de producción — no un dato garantizado. En cuanto tengas
+// cosechas reales registradas por columna, esto se puede reemplazar por
+// tus propios números.
+function graficaProduccionVariedad(v){
+  const meses = ['Sep','Oct','Nov','Dic','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago'];
+  const totalKg = v.plantas * v.kgPorPlanta;
+  const valores = v.distribucion.map(p => totalKg * p / 100);
+  const max = Math.max(1, ...valores);
+  const anchoCol = 24, altoMax = 90, margenInferior = 24, margenSup = 6;
+  const ancho = meses.length * anchoCol + 10;
+  const alto = altoMax + margenInferior + margenSup;
+  let barras = '';
+  meses.forEach((m, i) => {
+    const x = 5 + i*anchoCol;
+    const h = Math.max((valores[i]/max) * altoMax, valores[i] > 0 ? 2 : 0);
+    const y = margenSup + (altoMax - h);
+    barras += `<rect x="${x}" y="${y}" width="16" height="${h}" rx="2" fill="${v.color}"></rect>
+      <text x="${x+8}" y="${alto - margenInferior + 13}" font-size="9" text-anchor="middle" fill="#8a8270">${m}</text>`;
+  });
+  const filasTabla = meses.map((m,i) => `<tr><td>${m}</td><td style="text-align:right;">${Math.round(valores[i]).toLocaleString('es-MX')} kg</td></tr>`).join('');
+  return `
+    <div style="font-size:12px; color:#8a8270; margin:14px 0 4px; font-weight:700;">📈 Perspectiva de producción anual (estimada)</div>
+    <svg viewBox="0 0 ${ancho} ${alto}" width="100%" height="${alto}" preserveAspectRatio="xMinYMin meet" style="max-width:${ancho}px; display:block;">${barras}</svg>
+    <div style="font-size:11px; color:#8a8270; margin:6px 0 10px;">Estimado ilustrativo: ~${Math.round(totalKg).toLocaleString('es-MX')} kg/año en ${v.columnas} (≈${v.plantas.toLocaleString('es-MX')} plantas × ~${v.kgPorPlanta} kg/planta).</div>
+    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead><tr style="border-bottom:1px solid var(--crema-2);"><th style="text-align:left; padding:4px 0; color:#8a8270; font-weight:700;">Mes</th><th style="text-align:right; padding:4px 0; color:#8a8270; font-weight:700;">Producción est.</th></tr></thead>
+      <tbody>${filasTabla}</tbody>
+    </table>
+  `;
+}
+
+// Suma la producción mensual estimada de un conjunto de variedades.
+function calcularTotalMensual(variedades){
+  const totales = new Array(12).fill(0);
+  variedades.forEach(v => {
+    const totalKg = v.plantas * v.kgPorPlanta;
+    v.distribucion.forEach((p,i) => { totales[i] += totalKg*p/100; });
+  });
+  return totales;
+}
+
+// Producción TOTAL del invernadero con la selección final de variedades.
+function graficaTotalInvernadero(){
+  const meses = ['Sep','Oct','Nov','Dic','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago'];
+  const totales = calcularTotalMensual(VARIEDADES_INFO);
+  const max = Math.max(1,...totales), min = Math.min(...totales);
+  const anchoCol=24, altoMax=90, margenInferior=24, margenSup=6;
+  const ancho = meses.length*anchoCol+10;
+  const alto = altoMax+margenInferior+margenSup;
+  let barras='';
+  meses.forEach((m,i)=>{
+    const x=5+i*anchoCol;
+    const h=Math.max((totales[i]/max)*altoMax, totales[i]>0?2:0);
+    const y=margenSup+(altoMax-h);
+    barras += `<rect x="${x}" y="${y}" width="16" height="${h}" rx="2" fill="#2F4A2B"></rect><text x="${x+8}" y="${alto-margenInferior+13}" font-size="9" text-anchor="middle" fill="#8a8270">${m}</text>`;
+  });
+  const variacion = max>0 ? Math.round(((max-min)/max)*100) : 0;
+  const totalAnual = totales.reduce((a,b)=>a+b,0);
+  return `
+    <div class="card">
+      <h2>📦 Producción total del invernadero</h2>
+      <p style="font-size:12px; color:#8a8270; margin:-4px 0 12px; line-height:1.4;">Suma de las 4 variedades finales: Eclipse + Victor + Golden Gate + Albion.</p>
+      <svg viewBox="0 0 ${ancho} ${alto}" width="100%" height="${alto}" preserveAspectRatio="xMinYMin meet" style="max-width:${ancho}px; display:block;">${barras}</svg>
+      <div style="background:var(--crema-2); border-radius:12px; padding:12px; font-size:13px; margin-top:10px;">
+        <b>~${Math.round(totalAnual).toLocaleString('es-MX')} kg/año estimados</b> · mes más bajo vs. más alto: ${Math.round(min)}-${Math.round(max)} kg (variación ${variacion}%) · sin meses en cero 🎉
+      </div>
+    </div>
+  `;
+}
+
+function pintarVariedades(){
+  const cont = document.getElementById('listaVariedades');
+  if(!cont) return;
+  cont.innerHTML = `<div class="card" style="margin-bottom:0;"><p style="font-size:12px; color:#8a8270; margin:0; line-height:1.4;">Selección final del invernadero. Información de referencia general — puede variar según el proveedor/vivero específico. Las curvas de producción están ajustadas para la altitud y clima de Calimaya (~2,600 msnm). Las ilustraciones son dibujos propios (no fotos), para que se vean igual con o sin internet.</p></div>` +
+  graficaTotalInvernadero() +
+  VARIEDADES_INFO.map(v => `
+    <div class="card" style="border-left:4px solid ${v.color};">
+      <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:6px;">
+        ${svgFresaVariedad(v.color)}
+        <div>
+          <h2 style="margin-bottom:2px;">${escapeHtml(v.nombre)}</h2>
+          <div class="entry-meta">${escapeHtml(v.tipo)} · Columnas ${escapeHtml(v.columnas)}</div>
+        </div>
+      </div>
+      <p style="font-size:13.5px; line-height:1.5; margin:8px 0 10px;">${escapeHtml(v.descripcion)}</p>
+      <div style="font-size:12px; font-weight:700; color:#8a8270; margin-bottom:4px;">🌱 Salud y vulnerabilidad</div>
+      <ul style="margin:0 0 10px; padding-left:18px; font-size:13px; line-height:1.6; color:#4a4636;">
+        ${v.destacados.map(d => `<li>${escapeHtml(d)}</li>`).join('')}
+      </ul>
+      <div style="font-size:12px; font-weight:700; color:#8a8270; margin-bottom:4px;">🚀 Arranque</div>
+      <p style="font-size:13px; line-height:1.5; margin:0 0 10px; color:#4a4636;">${escapeHtml(v.arranque)}</p>
+      <div style="font-size:12px; font-weight:700; color:#8a8270; margin-bottom:4px;">🧪 Nutrición</div>
+      <p style="font-size:13px; line-height:1.5; margin:0; color:#4a4636;">${escapeHtml(v.nutricion)}</p>
+      ${graficaProduccionVariedad(v)}
+    </div>
+  `).join('');
+}
+
+// ---------- PLAN ANUAL (guía orientativa, no editable) ----------
+// Curva de desarrollo y nutrición para Victor (día corto) y Royal Royce /
+// Golden Gate (día neutro), pensado para un ciclo de 12 meses empezando
+// en septiembre. Las fechas de los recordatorios usan el día 1 de cada
+// mes (o el día de hoy para el primer mes) solo como marcador.
+const PLAN_ANUAL = [
+  { mes:'Septiembre', fecha:'2026-09-05', victor:'En floración / definición floral', rrgg:'Aún no se trasplanta (planta pedida para noviembre)', eclipse:'Aún no se planta (se planta en verano, jun-jul del próximo ciclo)', evento:'Confirmar pedido de raíz desnuda Golden Gate para noviembre', nutricion:'Victor sigue su programa de floración (Ca+B+Zn+Biozyme).' },
+  { mes:'Octubre', fecha:'2026-10-01', victor:'Pico de cosecha', rrgg:'Preparar sustrato/cama para la llegada de la planta', eclipse:'—', evento:'Preparar sustrato con buen drenaje y dejar listo el baño de fungicida+Trichoderma para raíz desnuda', nutricion:'Victor: K alto, Ca continuo.' },
+  { mes:'Noviembre', fecha:'2026-11-01', victor:'Cosecha continúa', rrgg:'Trasplante de raíz desnuda', eclipse:'—', evento:'Trasplante Golden Gate — baño de raíz (fungicida+Trichoderma) y monitoreo cada 2-3 días por hongos de raíz', nutricion:'Golden Gate: enraizador (ácidos húmicos/algas), riego ligero los primeros días, sin forzar nutrición fuerte aún.' },
+  { mes:'Diciembre', fecha:'2026-12-01', victor:'Cosecha continúa (cerca del solsticio, días aún cortos)', rrgg:'Establecimiento y primer enraizamiento', eclipse:'—', evento:'Revisar cortinas térmicas/calefacción nocturna — revisar enraizamiento de Golden Gate', nutricion:'Victor: K alto. Golden Gate: N moderado para desarrollo de raíz y follaje.' },
+  { mes:'Enero', fecha:'2027-01-01', victor:'Cosecha empieza a bajar (días ya alargando tras el solsticio)', rrgg:'Primera floración esperada (4-6 semanas post-trasplante)', eclipse:'—', evento:'Colocar polinizadores/abejorros — evaluar fin de ciclo de Victor', nutricion:'Golden Gate: Ca+B+Zn, empezar a subir K.' },
+  { mes:'Febrero', fecha:'2027-02-01', victor:'Fin de ciclo natural (planta se vuelve vegetativa/estolonífera)', rrgg:'Cosecha inicial en aumento', eclipse:'—', evento:'Decidir: renovar o remover Victor', nutricion:'Golden Gate: K en aumento, Ca continuo.' },
+  { mes:'Marzo', fecha:'2027-03-01', victor:'Si se remueve: preparar cama para el próximo ciclo de otoño', rrgg:'Cosecha en aumento', eclipse:'—', evento:'Preparar sustrato/cama para el próximo Victor — monitoreo de Botrytis (humedad de primavera)', nutricion:'Golden Gate: K alto sostenido.' },
+  { mes:'Abril', fecha:'2027-04-01', victor:'—', rrgg:'Cosecha en aumento', eclipse:'—', evento:'Monitoreo de plagas de primavera (araña roja, trips)', nutricion:'Golden Gate: Ca+B+Zn de refuerzo.' },
+  { mes:'Mayo', fecha:'2027-05-01', victor:'—', rrgg:'~6 meses desde el trasplante → toca poda de renovación', eclipse:'—', evento:'Poda de renovación Golden Gate', nutricion:'N moderado-alto para el rebrote post-poda.' },
+  { mes:'Junio', fecha:'2027-06-01', victor:'—', rrgg:'Rebrote vegetativo tras poda', eclipse:'Preparar sustrato/cama para el trasplante de Eclipse', evento:'Revisar ventilación/sombreo (empieza el calor) — preparar cama para Eclipse', nutricion:'Golden Gate: N para rebrote, aún no forzar floración.' },
+  { mes:'Julio', fecha:'2027-07-01', victor:'—', rrgg:'Nueva floración post-renovación', eclipse:'Trasplante de Eclipse (planta de verano)', evento:'Trasplante Eclipse — pedido de planta nueva de Victor (para trasplante de otoño)', nutricion:'Golden Gate: Ca+B+Zn de nuevo, K en aumento. Eclipse: enraizador al trasplante.' },
+  { mes:'Agosto', fecha:'2027-08-01', victor:'—', rrgg:'Producción de verano, preparando el relevo', eclipse:'Establecimiento — arranca a producir casi de inmediato', evento:'Preparar sustrato para nuevo ciclo de Victor', nutricion:'Golden Gate: K sostenido, mayor demanda de riego. Eclipse: K desde el arranque.' }
+];
+
+function pintarPlanAnual(){
+  const cont = document.getElementById('listaPlanAnual');
+  if(!cont) return;
+  cont.innerHTML = PLAN_ANUAL.map((m, idx) => `
+    <div class="card">
+      <h2 style="margin-bottom:6px;">${m.mes}</h2>
+      <div class="entry-meta" style="margin-bottom:8px;">🍓 <b>Victor:</b> ${escapeHtml(m.victor)}</div>
+      <div class="entry-meta" style="margin-bottom:8px;">🟡 <b>Golden Gate:</b> ${escapeHtml(m.rrgg)}</div>
+      <div class="entry-meta" style="margin-bottom:10px;">🍒 <b>Eclipse:</b> ${escapeHtml(m.eclipse)}</div>
+      <div class="entry-notes" style="margin-bottom:6px;">📅 ${escapeHtml(m.evento)}</div>
+      ${m.nutricion && m.nutricion !== '—' ? `<div class="entry-notes">🧪 ${escapeHtml(m.nutricion)}</div>` : ''}
+      <button class="btn-secondary" style="margin-top:10px;" onclick="agregarEventoPlanAnual(${idx})">+ Agregar este recordatorio a mi Agenda</button>
+    </div>
+  `).join('');
+}
+
+function agregarEventoPlanAnual(idx){
+  const m = PLAN_ANUAL[idx];
+  const yaExiste = eventos.some(e => e.fecha === m.fecha && e.texto === '🌱 Plan anual — ' + m.evento);
+  if(yaExiste){ alert('Ese recordatorio ya está en tu Agenda.'); return; }
+  const evento = { id: generarId(), fecha: m.fecha, hora:'', texto: '🌱 Plan anual — ' + m.evento, recordar:false };
+  eventos.push(evento);
+  eventos.sort((a,b) => (a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
+  fsGuardarItem('eventos', evento);
+  alert('Agregado a tu Agenda: ' + m.mes);
+}
+
+function agregarTodosEventosPlanAnual(){
+  if(!confirm('¿Agregar los 12 recordatorios del plan anual a tu Agenda?')) return;
+  let agregados = 0;
+  PLAN_ANUAL.forEach(m => {
+    const yaExiste = eventos.some(e => e.fecha === m.fecha && e.texto === '🌱 Plan anual — ' + m.evento);
+    if(yaExiste) return;
+    const evento = { id: generarId(), fecha: m.fecha, hora:'', texto: '🌱 Plan anual — ' + m.evento, recordar:false };
+    eventos.push(evento);
+    fsGuardarItem('eventos', evento);
+    agregados++;
+  });
+  eventos.sort((a,b) => (a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
+  alert(agregados + ' recordatorios agregados a tu Agenda (los que ya existían no se duplicaron).');
+}
+
+// ---------- CATÁLOGO DEL PROVEEDOR (para importar a Inventario) ----------
+const CATALOGO_PROVEEDOR = [
+  { nombre:'Baciver®', ingredienteActivo:'Bacillus subtilis (10.00% / 1x10⁹ UFC/g)', categoria:'Fungicida biológico / Biorracional', tipoProblema:'Hongo', subcategoria:'Cenicilla, hongos foliares', dosisRecomendada:'1.0 a 2.0 Kg/ha foliar preventivo', unidad:'Bolsa de 1 Kg', proveedor:'Grupo Versa' },
+  { nombre:'Avalanch®', ingredienteActivo:'Abamectina (1.80%)', categoria:'Insecticida / Acaricida', tipoProblema:'Plaga', subcategoria:'Araña roja (Tetranychus urticae), ácaros', dosisRecomendada:'0.5 a 1.0 L/ha aspersión foliar', unidad:'Envase 250 ml / 1 L', proveedor:'Dragón (Agricultura Nacional)' },
+  { nombre:'Amino Mix 20.00', ingredienteActivo:'N 10% + P2O5 12% + K2O 12% + Aminoácidos libres 5%', categoria:'Nutrición vegetal / Bioestimulante foliar', tipoProblema:'', subcategoria:'Estrés hídrico/térmico, amarre de floración', dosisRecomendada:'1.5 a 2.5 L/ha foliar', unidad:'Botella 1 L', proveedor:'Agro-Caminante (Distribuidor)' },
+  { nombre:'Bacter-Stop', ingredienteActivo:'Complejo orgánico botánico 15% + Cobre complejado 5%', categoria:'Fungicida y Bactericida sistémico', tipoProblema:'Hongo', subcategoria:'Tizón bacteriano, cenicillas, pudriciones de tallo/corona', dosisRecomendada:'1.5 a 2.5 L/ha foliar', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Grupo Fagro' },
+  { nombre:'Switch® 62.5 WG', ingredienteActivo:'Fludioxonil 25% + Cyprodinil 37.5%', categoria:'Fungicida sistémico y de contacto', tipoProblema:'Hongo', subcategoria:'Pudrición gris (Botrytis cinerea), Mycosphaerella', dosisRecomendada:'0.8 a 1.0 Kg/ha al inicio de floración', unidad:'Bolsa 1 Kg', proveedor:'Syngenta México' },
+  { nombre:'Serenade® OPTI', ingredienteActivo:'Bacillus amyloliquefaciens cepa QST 713 (26.20%)', categoria:'Fungicida / Bactericida biológico', tipoProblema:'Hongo', subcategoria:'Cenicilla polvorienta, bacteriosis foliares', dosisRecomendada:'1.0 a 1.5 Kg/ha foliar', unidad:'Bolsa 1 Kg', proveedor:'Bayer México (Mi Cultivo)' },
+  { nombre:'Splendor®', ingredienteActivo:'Aminoácidos libres 15% + P2O5 12% + K2O 16%', categoria:'Nutrición vegetal / Bioestimulante de floración', tipoProblema:'', subcategoria:'Caída de flores, aborto de frutos, calibre/color', dosisRecomendada:'2.0 a 3.0 L/ha foliar', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Minecto® Duo', ingredienteActivo:'Cyantraniliprole 20% + Thiamethoxam 20%', categoria:'Insecticida sistémico amplio espectro', tipoProblema:'Plaga', subcategoria:'Drosophila suzukii, trips, pulgones, picudo', dosisRecomendada:'0.4 a 0.6 Kg/ha goteo/drench', unidad:'Envase 500 g / 1 Kg', proveedor:'Syngenta México' },
+  { nombre:'Captan Dragón 50 PH', ingredienteActivo:'Captan 50%', categoria:'Fungicida de contacto / Preventivo', tipoProblema:'Hongo', subcategoria:'Antracnosis, pudriciones del fruto', dosisRecomendada:'1.5 a 2.5 Kg/ha antes de lluvias', unidad:'Bolsa 1 Kg', proveedor:'Dragón (Agricultura Nacional)' },
+  { nombre:'Rooting®', ingredienteActivo:'Auxinas 0.05% + Vit. B 0.10% + Fósforo asimilable 10%', categoria:'Nutrición vegetal / Enraizador orgánico-mineral', tipoProblema:'', subcategoria:'Desarrollo radicular tras trasplante', dosisRecomendada:'2.0 a 4.0 L/ha por goteo', unidad:'Garrafa 5 L / 20 L', proveedor:'Mezfer' },
+  { nombre:'Karigane®', ingredienteActivo:'Extracto de Melaleuca alternifolia (23.80%)', categoria:'Fungicida y bactericida biorracional', tipoProblema:'Hongo', subcategoria:'Cenicilla polvorienta, prevención de Botrytis', dosisRecomendada:'1.0 a 1.5 L/ha foliar', unidad:'Envase 1 L', proveedor:'Grupo Versa' },
+  { nombre:'Imidacloprid Dragón 350 SC', ingredienteActivo:'Imidacloprid 35% (350 g/L)', categoria:'Insecticida sistémico', tipoProblema:'Plaga', subcategoria:'Pulgones, mosquita blanca, trips de la flor', dosisRecomendada:'0.75 a 1.0 L/ha goteo/drench', unidad:'Envase 250 ml / 1 L / garrafa 5 L', proveedor:'Dragón (Agricultura Nacional)' },
+  { nombre:'Acidex-F', ingredienteActivo:'Ácidos orgánicos 45% + amortiguadores de pH', categoria:'Coadyuvante / Regulador de pH', tipoProblema:'', subcategoria:'Aguas duras, inactivación de agroquímicos', dosisRecomendada:'0.5 a 1.0 ml/L de agua', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Grupo Fagro' },
+  { nombre:'Kumulus® DF', ingredienteActivo:'Azufre elemental (80.00%)', categoria:'Fungicida / Acaricida de contacto', tipoProblema:'Plaga', subcategoria:'Cenicilla de la fresa, araña roja preventivo', dosisRecomendada:'2.0 a 4.0 Kg/ha foliar', unidad:'Bolsa 1 Kg / saco 10 Kg', proveedor:'Agro-Caminante (Distribuidor)' },
+  { nombre:'ProGibb® 40% SG', ingredienteActivo:'Ácido Giberélico GA3 (40.00%)', categoria:'Regulador de crecimiento vegetal / Fitorregulador', tipoProblema:'', subcategoria:'Pedúnculos florales cortos, latencia invernal', dosisRecomendada:'20 a 50 g/ha (calibrar ppm)', unidad:'Sobre 2.5 g / tubo 10 g', proveedor:'Mezfer / Valent' },
+  { nombre:'Push®', ingredienteActivo:'Extracto de Gobernadora Larrea tridentata (20.00%)', categoria:'Fungicida orgánico / Inductor de resistencia', tipoProblema:'Hongo', subcategoria:'Antracnosis, Fusarium, Phytophthora', dosisRecomendada:'2.0 a 3.0 L/ha fertirriego/follaje', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Exirel®', ingredienteActivo:'Cyantraniliprole 10% (100 g/L)', categoria:'Insecticida foliar sistémico local', tipoProblema:'Plaga', subcategoria:'Drosophila suzukii, Trips', dosisRecomendada:'0.75 a 1.0 L/ha foliar', unidad:'Envase 1 L', proveedor:'FMC México' },
+  { nombre:'K-Leaf®', ingredienteActivo:'Sulfato de Potasio K2O 52% + Azufre 18%', categoria:'Nutrición vegetal / Fertilizante soluble', tipoProblema:'Deficiencia', subcategoria:'Deficiencia de potasio, grados Brix, firmeza', dosisRecomendada:'2.5 a 5.0 Kg/ha foliar o fertirriego', unidad:'Saco 25 Kg', proveedor:'Tessenderlo Kerley' },
+  { nombre:'Aliette® WDG', ingredienteActivo:'Fosetil-Aluminio (80.00%)', categoria:'Fungicida sistémico completo', tipoProblema:'Hongo', subcategoria:'Pudrición de corona/raíz (Phytophthora cactorum)', dosisRecomendada:'2.5 a 3.0 Kg/ha follaje o goteo', unidad:'Bolsa 1 Kg', proveedor:'Bayer México (Mi Cultivo)' },
+  { nombre:'Biocrifol®', ingredienteActivo:'Extracto vegetal 30% + Ácidos fúlvicos 5%', categoria:'Nutrición vegetal / Optimizador de absorción radicular', tipoProblema:'', subcategoria:'Bloqueo de nutrientes, baja actividad microbiológica', dosisRecomendada:'2.0 a 4.0 L/ha por goteo', unidad:'Garrafa 5 L / 20 L', proveedor:'Grupo Fagro' },
+  { nombre:'Delegate® 250 WG', ingredienteActivo:'Spinetoram (25.00%)', categoria:'Insecticida de origen natural', tipoProblema:'Plaga', subcategoria:'Trips de las flores, orugas del fruto', dosisRecomendada:'150 a 200 g/ha foliar', unidad:'Frasco 250 g', proveedor:'Corteva Agriscience' },
+  { nombre:'Celeste® 720 FW', ingredienteActivo:'Clorotalonil 54% (720 g/L)', categoria:'Fungicida de contacto amplio espectro', tipoProblema:'Hongo', subcategoria:'Peca de la hoja, Antracnosis (prefloración)', dosisRecomendada:'1.5 a 2.5 L/ha foliar', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Grupo Versa' },
+  { nombre:'Abamectina Dragón 1.8 CE', ingredienteActivo:'Abamectina 1.80% (18 g/L)', categoria:'Insecticida / Acaricida translaminar', tipoProblema:'Plaga', subcategoria:'Araña roja severa, minadores foliares', dosisRecomendada:'0.5 a 1.0 L/ha, mojar envés', unidad:'Envase 1 L', proveedor:'Dragón (Agricultura Nacional)' },
+  { nombre:'Maxim® Quattro', ingredienteActivo:'Fludioxonil 1.85% + Metalaxil-M 3.70% + Tiabendazol 22.20% + Azoxistrobina 1.48%', categoria:'Fungicida curativo/preventivo para material vegetal', tipoProblema:'Hongo', subcategoria:'Hongos del suelo en estolones/coronas de raíz desnuda', dosisRecomendada:'100 a 150 ml/100L agua, tina de inmersión', unidad:'Envase 1 L', proveedor:'Syngenta México' },
+  { nombre:'Humika®', ingredienteActivo:'Ácidos húmicos y fúlvicos de leonardita (15.00%)', categoria:'Nutrición vegetal / Mejorador estructural de suelos', tipoProblema:'', subcategoria:'Suelos compactados, lixiviación de macronutrientes', dosisRecomendada:'5.0 a 10.0 L/ha mensual fertirriego', unidad:'Garrafa 5 L / bidón 20 L', proveedor:'Mezfer' },
+  { nombre:'Kanemite® 15 SC', ingredienteActivo:'Acequinocil 15% (150 g/L)', categoria:'Acaricida específico de contacto', tipoProblema:'Plaga', subcategoria:'Ácaros resistentes (todas las fases)', dosisRecomendada:'1.0 a 1.25 L/ha foliar', unidad:'Envase 1 L', proveedor:'AgroScience / FMC' },
+  { nombre:'Inex-A®', ingredienteActivo:'Polietilenglicol y éteres de poliglicol (80.00%)', categoria:'Coadyuvante / Tensoactivo no iónico', tipoProblema:'', subcategoria:'Adherencia de gotas, lavado por rocío', dosisRecomendada:'1.0 a 2.0 ml/L de agua', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Cosmocel' },
+  { nombre:'Quadris® Top', ingredienteActivo:'Azoxistrobina 20% + Difenoconazol 12.50%', categoria:'Fungicida sistémico y preventivo', tipoProblema:'Hongo', subcategoria:'Antracnosis, cenicilla, manchas foliares', dosisRecomendada:'0.75 a 1.0 L/ha alta humedad', unidad:'Envase 1 L', proveedor:'Syngenta México' },
+  { nombre:'Confidor® 350 SC', ingredienteActivo:'Imidacloprid 35% (350 g/L)', categoria:'Insecticida sistémico', tipoProblema:'Plaga', subcategoria:'Pulgones, mosquita blanca, trips vectores', dosisRecomendada:'0.75 a 1.0 L/ha riego por goteo', unidad:'Envase 1 L', proveedor:'Bayer México (Mi Cultivo)' },
+  { nombre:'Calboron®', ingredienteActivo:'Calcio 30% + Boro 1% complejado', categoria:'Nutrición vegetal / Corrector de deficiencias', tipoProblema:'Deficiencia', subcategoria:'Pudrición apical, ablandamiento, rajado, caída de flores', dosisRecomendada:'2.0 a 3.0 Kg/ha en amarre y llenado', unidad:'Bolsa 1 Kg / 5 Kg', proveedor:'Green Has / Distribuidores locales' },
+  { nombre:'Captan 50 WP (Versa)', ingredienteActivo:'Captan 50%', categoria:'Fungicida de contacto / Multisitio', tipoProblema:'Hongo', subcategoria:'Botrytis cinerea, Antracnosis', dosisRecomendada:'1.5 a 2.5 Kg/ha', unidad:'Saco 1 Kg / 25 Kg', proveedor:'Grupo Versa' },
+  { nombre:'Oberon® Speed', ingredienteActivo:'Spiromesifen 22.85% + Abamectina 1.08%', categoria:'Insecticida / Acaricida de contacto y translaminar', tipoProblema:'Plaga', subcategoria:'Araña roja, mosquita blanca (todas las fases)', dosisRecomendada:'0.6 a 0.8 L/ha alta presión', unidad:'Envase 500 ml / 1 L', proveedor:'Bayer México (Mi Cultivo)' },
+  { nombre:'Mycoshield®', ingredienteActivo:'Oxitetraciclina (17.00%)', categoria:'Bactericida agrícola / Antibiótico sistémico local', tipoProblema:'Hongo', subcategoria:'Mancha bacteriana (Xanthomonas fragariae), tizón', dosisRecomendada:'1.0 a 1.5 Kg/ha preventivo tras granizo/poda', unidad:'Bolsa 1 Kg', proveedor:'Nufarm / Comercializadoras locales' },
+  { nombre:'Bio-Forge®', ingredienteActivo:'N,N\'-diformil urea (2.00% antioxidante activo)', categoria:'Nutrición vegetal / Bioestimulante antiestrés', tipoProblema:'', subcategoria:'Paro de crecimiento por heladas o intoxicación', dosisRecomendada:'0.5 a 1.0 L/ha foliar', unidad:'Envase 1 L', proveedor:'Stoller de México' },
+  { nombre:'Rootex®', ingredienteActivo:'Ácidos orgánicos 10% + Aminoácidos 5% + P2O5 25% + Auxinas', categoria:'Nutrición vegetal / Enraizador concentrado', tipoProblema:'', subcategoria:'Escaso desarrollo radicular, anclaje de plántulas', dosisRecomendada:'1.0 a 2.0 Kg/ha drench o fertirriego post-trasplante', unidad:'Bolsa 1 Kg / cubeta 10 Kg', proveedor:'Cosmocel' },
+  { nombre:'Proclaim® 5 SG', ingredienteActivo:'Benzoato de Emamectina (5.00%)', categoria:'Insecticida de contacto e ingestión', tipoProblema:'Plaga', subcategoria:'Larvas de lepidópteros, gusano del fruto/soldado', dosisRecomendada:'100 a 150 g/ha foliar', unidad:'Frasco 100 g / 500 g', proveedor:'Syngenta México' },
+  { nombre:'Silvacur® Combi', ingredienteActivo:'Tebuconazol 10% + Triadimenol 20%', categoria:'Fungicida sistémico preventivo y curativo', tipoProblema:'Hongo', subcategoria:'Roya de zarzamora, cenicillas difíciles', dosisRecomendada:'0.75 a 1.0 L/ha ante primeros síntomas', unidad:'Envase 1 L', proveedor:'Bayer México (Mi Cultivo)' },
+  { nombre:'Cabrio® C', ingredienteActivo:'Pyraclostrobin 5% + Boscalid 25.20%', categoria:'Fungicida sistémico y de contacto', tipoProblema:'Hongo', subcategoria:'Botrytis cinerea, cenicilla, Antracnosis', dosisRecomendada:'0.8 a 1.0 Kg/ha preventivo, alta humedad', unidad:'Bolsa 1 Kg', proveedor:'BASF México' },
+  { nombre:'Nealta®', ingredienteActivo:'Cyflumetofen (18.70%)', categoria:'Acaricida de contacto específico', tipoProblema:'Plaga', subcategoria:'Araña roja (todas las fases móviles)', dosisRecomendada:'1.0 L/ha foliar', unidad:'Envase 1 L', proveedor:'BASF México' },
+  { nombre:'Poly-Feed™ Drip 19-19-19', ingredienteActivo:'N 19% + P2O5 19% + K2O 19% + micronutrientes', categoria:'Nutrición vegetal / Fertilizante soluble NPK', tipoProblema:'Deficiencia', subcategoria:'Desbalance nutricional, estancamiento vegetativo', dosisRecomendada:'20 a 50 Kg/ha/semana fertirriego', unidad:'Saco 25 Kg', proveedor:'Haifa Group' },
+  { nombre:'Verimark®', ingredienteActivo:'Cyantraniliprole (18.66%)', categoria:'Insecticida sistémico al suelo', tipoProblema:'Plaga', subcategoria:'Drosophila suzukii, trips y pulgones (preventivo)', dosisRecomendada:'0.375 a 0.5 L/ha goteo post-trasplante', unidad:'Envase 1 L', proveedor:'FMC México' },
+  { nombre:'Kelpak®', ingredienteActivo:'Extracto de alga Ecklonia maxima (100%)', categoria:'Nutrición vegetal / Bioestimulante orgánico', tipoProblema:'', subcategoria:'Estrés post-trasplante, aborto floral por heladas', dosisRecomendada:'2.0 L/ha foliar o 200ml/100L inmersión de raíces', unidad:'Envase 1 L / garrafa 5 L', proveedor:'BASF México' },
+  { nombre:'SeaPower', ingredienteActivo:'Algas Ascophyllum nodosum 20% + Ácidos fúlvicos 5%', categoria:'Nutrición vegetal / Bioestimulante orgánico de suelos', tipoProblema:'', subcategoria:'Baja asimilación de P-K-Ca, microflora radicular', dosisRecomendada:'1.0 a 2.0 Kg/ha fertirriego', unidad:'Bolsa 1 Kg', proveedor:'AgroScience' },
+  { nombre:'Biocontrol® Citrex', ingredienteActivo:'Extracto de semillas de cítricos 20% + ácidos orgánicos 5%', categoria:'Insecticida / Acaricida orgánico biorracional', tipoProblema:'Plaga', subcategoria:'Trips y pulgones (cutícula blanda)', dosisRecomendada:'1.0 a 2.0 L/ha foliar', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Everex', ingredienteActivo:'N orgánico 5% + Aminoácidos 10% + complejo vitamínico 1%', categoria:'Nutrición vegetal / Inmunopotencializador foliar', tipoProblema:'', subcategoria:'Detención de crecimiento vegetativo', dosisRecomendada:'1.5 a 2.5 L/ha crecimiento activo', unidad:'Envases 1, 5, 10 y 20 L', proveedor:'AgroScience' },
+  { nombre:'Push® (2)', ingredienteActivo:'Extracto de Gobernadora Larrea tridentata (20.00%)', categoria:'Fungicida orgánico / Inductor de resistencia', tipoProblema:'Hongo', subcategoria:'Fusarium, Rhizoctonia, Phytophthora (raíz/corona)', dosisRecomendada:'2.0 a 3.0 L/ha fertirriego o drench', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Root-Factor', ingredienteActivo:'Extractos vegetales 15% + Ácidos fúlvicos 5% + P2O5 10%', categoria:'Nutrición vegetal / Enraizador biológico', tipoProblema:'', subcategoria:'Estrés de trasplante en estolones', dosisRecomendada:'1.0 a 2.0 L/ha al suelo, día 8 post-trasplante', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'XP-Amino', ingredienteActivo:'Aminoácidos libres 24% + N orgánico 4.5%', categoria:'Nutrición vegetal / Activador fisiológico antiestrés', tipoProblema:'', subcategoria:'Pérdida de vigor por heladas/granizo/estrés térmico', dosisRecomendada:'500ml a 1.5 L/ha desde prefloración', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Turgent Ca', ingredienteActivo:'Calcio soluble 10% + Boro quelatado 0.5%', categoria:'Nutrición vegetal / Corrector de firmeza', tipoProblema:'Deficiencia', subcategoria:'Frutos blandos, cracking, deformaciones apicales', dosisRecomendada:'4.0 a 8.0 L/ha semanal fertirriego desde amarre', unidad:'Garrafa 5 L / bidón 20 L', proveedor:'AgroScience' },
+  { nombre:'Gro Bomo', ingredienteActivo:'Boro soluble 10% + Molibdeno 0.5%', categoria:'Nutrición vegetal / Estimulante de polinización', tipoProblema:'', subcategoria:'Pobre viabilidad de polen, caída de flores', dosisRecomendada:'500ml a 1.5 L/ha prefloración', unidad:'Envase 1 L', proveedor:'AgroScience' },
+  { nombre:'Biocontrol® Neem', ingredienteActivo:'Extracto de aceite de Neem (85.00%)', categoria:'Insecticida / Acaricida orgánico', tipoProblema:'Plaga', subcategoria:'Pulgón de la fresa, mosquita blanca, larvas', dosisRecomendada:'1.0 a 2.0 L/ha, cobertura del envés', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Teldor® 500 SC', ingredienteActivo:'Fenhexamid (50.00% v/v)', categoria:'Fungicida de contacto específico', tipoProblema:'Hongo', subcategoria:'Pudrición gris (Botrytis cinerea) en floración', dosisRecomendada:'1.0 a 1.5 L/ha floración y precosecha', unidad:'Envase 1 L', proveedor:'Bayer México (Mi Cultivo)' },
+  { nombre:'Mycotrol® ESO', ingredienteActivo:'Beauveria bassiana cepa GHA (11.30%)', categoria:'Insecticida biológico / Hongo entomopatógeno', tipoProblema:'Plaga', subcategoria:'Trips, mosquita blanca, ácaros', dosisRecomendada:'0.5 a 1.5 L/ha, aplicar por la tarde', unidad:'Envase 1 L', proveedor:'Certis Biologicals' },
+  { nombre:'Promicil®', ingredienteActivo:'Trichoderma harzianum (1x10⁹ UFC/g)', categoria:'Fungicida biológico / Inoculante de suelo', tipoProblema:'Hongo', subcategoria:'Fusarium spp., Rhizoctonia, Pythium', dosisRecomendada:'1.0 a 2.0 Kg/ha goteo/drench post-trasplante', unidad:'Bolsa 1 Kg', proveedor:'Grupo Fagro' },
+  { nombre:'DiPel® 2X DF', ingredienteActivo:'Bacillus thuringiensis subsp. kurstaki (54.00%)', categoria:'Insecticida biológico / Biorracional', tipoProblema:'Plaga', subcategoria:'Gusano soldado, gusano del fruto (larvas)', dosisRecomendada:'0.5 a 1.0 Kg/ha ante presencia de larvas', unidad:'Bolsa 1 Kg', proveedor:'Valent de México' },
+  { nombre:'Timorex Gold®', ingredienteActivo:'Extracto de Melaleuca alternifolia (23.80%)', categoria:'Fungicida orgánico / Biorracional', tipoProblema:'Hongo', subcategoria:'Botrytis cinerea, Cenicilla polvorienta', dosisRecomendada:'1.0 a 1.5 L/ha, buena cobertura', unidad:'Envase 1 L / garrafa 5 L', proveedor:'FMC México' },
+  { nombre:'Sanisper®', ingredienteActivo:'Extracto de semilla de toronja 20% + ácidos orgánicos 5%', categoria:'Desinfectante agrícola / Inocuidad', tipoProblema:'Hongo', subcategoria:'Patógenos en agua de riego, herramientas, charolas', dosisRecomendada:'1-2 ml/L (superficies) o 200-500ml/10,000L riego', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Oxiclor® 50 PH', ingredienteActivo:'Oxicloruro de Cobre (85% / 50% cobre metálico)', categoria:'Fungicida / Bactericida de contacto', tipoProblema:'Hongo', subcategoria:'Antracnosis, mildius, mancha bacteriana', dosisRecomendada:'2.0 a 3.0 Kg/ha (evitar floración plena)', unidad:'Bolsa 1 Kg', proveedor:'Grupo Versa' },
+  { nombre:'Silifert®', ingredienteActivo:'Silicato de Potasio (Si 25% + K 15%)', categoria:'Nutrición vegetal / Inductor de resistencia mecánica', tipoProblema:'', subcategoria:'Tejidos débiles, barrera contra chupadores y hongos', dosisRecomendada:'1-2 L/ha foliar o 3-5 L/ha fertirriego', unidad:'Garrafa 5 L', proveedor:'Mezfer' },
+  { nombre:'Entrust® SC', ingredienteActivo:'Spinosad (22.50%)', categoria:'Insecticida natural (uso orgánico)', tipoProblema:'Plaga', subcategoria:'Drosophila suzukii, Trips occidentales', dosisRecomendada:'200 a 300 ml/ha dirigido a fructificación', unidad:'Frasco 250 ml / 1 L', proveedor:'Corteva Agriscience' },
+  { nombre:'Cuprimicin® 100', ingredienteActivo:'Estreptomicina 15% + Oxitetraciclina 1.5% + Sulfato de Cobre', categoria:'Bactericida / Antibiótico agrícola sistémico', tipoProblema:'Hongo', subcategoria:'Tizón bacteriano, mancha angular', dosisRecomendada:'600 a 800 g/ha foliar preventiva', unidad:'Bolsa 500 g / 1 Kg', proveedor:'Dragón (Agricultura Nacional)' },
+  { nombre:'Nutri-Phite® P+K', ingredienteActivo:'Fosfito de Potasio (P2O5 40% + K2O 30%)', categoria:'Nutrición vegetal / Inductor de fitoalexinas', tipoProblema:'', subcategoria:'Baja respuesta inmune, defensas ante Phytophthora', dosisRecomendada:'1.5 a 2.5 L/ha goteo o follaje', unidad:'Garrafa 5 L', proveedor:'Verdesian Life Sciences' },
+  { nombre:'Ultrasol® Inicial (15-30-15)', ingredienteActivo:'N 15% + P2O5 30% + K2O 15% + microelementos', categoria:'Nutrición vegetal / Fertilizante soluble NPK', tipoProblema:'Deficiencia', subcategoria:'Desarrollo radicular, establecimiento post-trasplante', dosisRecomendada:'25 a 60 Kg/ha/semana fertirriego', unidad:'Saco 25 Kg', proveedor:'SQM México' },
+  { nombre:'Ultrasol® Producción (13-6-40)', ingredienteActivo:'N 13% + P2O5 6% + K2O 40% + microelementos', categoria:'Nutrición vegetal / Fertilizante NPK de llenado', tipoProblema:'Deficiencia', subcategoria:'Frutos pequeños, bajo Brix, mala coloración', dosisRecomendada:'40 a 80 Kg/ha/semana fructificación', unidad:'Saco 25 Kg', proveedor:'SQM México' },
+  { nombre:'Aminocel® WSP', ingredienteActivo:'Aminoácidos libres de alta pureza (80.00%)', categoria:'Nutrición vegetal / Bioestimulante antiestrés', tipoProblema:'', subcategoria:'Desgaste por heladas o granizadas', dosisRecomendada:'0.5 a 1.0 Kg/ha en máxima demanda fisiológica', unidad:'Bolsa 1 Kg', proveedor:'Cosmocel' },
+  { nombre:'Hydro-Cal®', ingredienteActivo:'Calcio soluble 12% + ácidos fulvocarboxílicos', categoria:'Nutrición vegetal / Corrector de suelos', tipoProblema:'Deficiencia', subcategoria:'Sales acumuladas, suelos compactados, baja absorción de Ca', dosisRecomendada:'5.0 a 15.0 L/ha periódico fertirriego', unidad:'Garrafa 5 L / bidón 20 L', proveedor:'Cosmocel' },
+  { nombre:'Cytokin®', ingredienteActivo:'Cinetina (citocininas puras 0.01%)', categoria:'Nutrición vegetal / Regulador de crecimiento', tipoProblema:'', subcategoria:'Escasa brotación lateral, racimos cortos', dosisRecomendada:'0.5 a 1.0 L/ha prefloración y amarre', unidad:'Envase 1 L', proveedor:'Bayer México (Mi Cultivo)' },
+  { nombre:'Zinc-Factor', ingredienteActivo:'Zinc quelatado 10% + aminoácidos de transporte', categoria:'Nutrición vegetal / Corrector de microelementos', tipoProblema:'Deficiencia', subcategoria:'Hojas pequeñas/arrosetadas, entrenudos cortos', dosisRecomendada:'1.0 a 2.0 L/ha dirigido a brotes nuevos', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Magnesium-Factor', ingredienteActivo:'MgO 6% + Hierro quelatado 0.10% + aminoácidos', categoria:'Nutrición vegetal / Optimizador de fotosíntesis', tipoProblema:'', subcategoria:'Clorosis intervenal en hojas viejas', dosisRecomendada:'1.5 a 3.0 L/ha foliar o al suelo', unidad:'Garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Fagro-K Max', ingredienteActivo:'K2O orgánico 30% + extractos orgánicos', categoria:'Nutrición vegetal / Madurante foliar', tipoProblema:'', subcategoria:'Llenado lento, falta de firmeza', dosisRecomendada:'2.0 a 3.0 L/ha desde inicio de cuaje', unidad:'Garrafa 5 L / bidón 20 L', proveedor:'Grupo Fagro' },
+  { nombre:'Humifagro® Liquid', ingredienteActivo:'Ácidos húmicos 12% + fúlvicos 3% (leonardita)', categoria:'Nutrición vegetal / Mejorador orgánico de rizosfera', tipoProblema:'', subcategoria:'Suelo cansado, baja materia orgánica', dosisRecomendada:'5.0 a 10.0 L/ha cada 15-30 días', unidad:'Bidón 20 L', proveedor:'Grupo Fagro' },
+  { nombre:'Multifeed® Berries (14-8-30)', ingredienteActivo:'N 14% + P2O5 8% + K2O 30% + Ca 2% + microelementos', categoria:'Nutrición vegetal / Fórmula integral fertirriego', tipoProblema:'', subcategoria:'Curvas disparejas de nutrición en berries', dosisRecomendada:'30 a 70 Kg/ha/semana', unidad:'Saco 25 Kg', proveedor:'Mezfer' },
+  { nombre:'Poly-Feed® Mar (12-5-40)', ingredienteActivo:'NPK 12-5-40 + algas Ascophyllum nodosum 1%', categoria:'Nutrición vegetal / Fertilizante soluble premium', tipoProblema:'Deficiencia', subcategoria:'Plantas agotadas en picos de producción', dosisRecomendada:'20 a 50 Kg/ha/semana goteo', unidad:'Saco 25 Kg', proveedor:'Haifa Group' },
+  { nombre:'Haifa Cal® GG', ingredienteActivo:'N-NO3 15.5% + CaO 26.5%', categoria:'Nutrición vegetal / Fertilizante simple soluble', tipoProblema:'Deficiencia', subcategoria:'Deficiencia de calcio estructural', dosisRecomendada:'15 a 40 Kg/ha/semana (no mezclar con sulfatos/fosfatos)', unidad:'Saco 25 Kg', proveedor:'Haifa Group' },
+  { nombre:'Versamin® Total', ingredienteActivo:'Fe 2% + Mn 1% + Zn 2% + B 0.5% + Cu 0.25% quelatados', categoria:'Nutrición vegetal / Corrector de microelementos', tipoProblema:'Deficiencia', subcategoria:'Clorosis por pH alcalino/bloqueo de metales traza', dosisRecomendada:'1.0-2.5 L/ha foliar o 3-5 L/ha goteo', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Grupo Versa' },
+  { nombre:'Maxigrow® Excel', ingredienteActivo:'Compuestos orgánicos liberadores de energía (10%)', categoria:'Nutrición vegetal / Bioestimulante enzimático', tipoProblema:'', subcategoria:'Amarre deficiente, caída de frutos cuajados', dosisRecomendada:'0.5 a 1.0 L/ha floración y cuajado', unidad:'Envase 1 L', proveedor:'Dragón (Agricultura Nacional)' },
+  { nombre:'Folivex® WSP', ingredienteActivo:'P2O5 50% + N 10% + K 10% + aminoácidos', categoria:'Nutrición vegetal / Arrancador y bioestimulante', tipoProblema:'', subcategoria:'Bajo vigor tras poda, retraso de floración', dosisRecomendada:'1.0 a 2.0 Kg/ha follaje', unidad:'Bolsa 1 Kg', proveedor:'Grupo Fagro' },
+  { nombre:'Folyver®', ingredienteActivo:'N 13.2% + P2O5 9.9% + K2O 7.1% + microelementos + auxinas', categoria:'Nutrición vegetal / Regulador de crecimiento foliar', tipoProblema:'', subcategoria:'Retraso metabólico, desarrollo radicular post-trasplante', dosisRecomendada:'1.0 a 2.0 L/ha desarrollo vegetativo/inicio de floración', unidad:'Envase 1 L / garrafa 20 L / bidón 50 L', proveedor:'Grupo Versa' },
+  { nombre:'Biozyme® TF', ingredienteActivo:'Extractos vegetales 66.86% + AG3 0.0032% + Cinetina 0.0083% + AIA 0.0032%', categoria:'Nutrición vegetal / Bioestimulante hormonal', tipoProblema:'', subcategoria:'Caída de frutos cuajados, retraso de división celular', dosisRecomendada:'1.0 a 2.0 L/ha en prefloración, floración y cuajado', unidad:'Envase 1 L / garrafa 5 L', proveedor:'UPL México' },
+  { nombre:'BioGib® 10 SP', ingredienteActivo:'Ácido Giberélico GA3 (10.00%)', categoria:'Nutrición vegetal / Fitorregulador', tipoProblema:'', subcategoria:'Latencia extrema, pedúnculos cortos en fresa', dosisRecomendada:'50 a 150 g/ha (calibrar ppm)', unidad:'Sobre 100 g / tarro 500 g', proveedor:'UPL México' },
+  { nombre:'Splendor® (2)', ingredienteActivo:'Aminoácidos 15% + P2O5 12% + K2O 16%', categoria:'Nutrición vegetal / Bioestimulante de floración', tipoProblema:'', subcategoria:'Aborto floral por heladas súbitas en valles altos', dosisRecomendada:'2.0-3.0 L/ha foliar o 5.0 L/ha fertirriego', unidad:'Envase 1 L / garrafa 5 L', proveedor:'AgroScience' },
+  { nombre:'Kinet®', ingredienteActivo:'Cinetina 0.01% + aminoácidos + carbohidratos', categoria:'Nutrición vegetal / Fitorregulador', tipoProblema:'', subcategoria:'Dominancia apical, retraso de envejecimiento foliar', dosisRecomendada:'0.5 a 1.0 L/ha inicial o post-poda', unidad:'Envase 1 L', proveedor:'Dragón (Agricultura Nacional)' },
+  { nombre:'YaraLiva® Calcinit®', ingredienteActivo:'N 15.5% (NO3 14.4%, NH4 1.1%) + CaO 26.5%', categoria:'Nutrición vegetal / Fertilizante simple soluble', tipoProblema:'Deficiencia', subcategoria:'Deficiencia de calcio, ablandamiento, pudrición de corona', dosisRecomendada:'25 a 50 Kg/ha/semana (no mezclar sulfatos/fosfatos)', unidad:'Saco 25 Kg', proveedor:'Yara México' },
+  { nombre:'YaraTera® Krista™ SOP', ingredienteActivo:'K2O 52% + S 18%', categoria:'Nutrición vegetal / Fertilizante simple sin cloro', tipoProblema:'Deficiencia', subcategoria:'Llenado lento, bajo Brix, estrés por sales', dosisRecomendada:'15 a 40 Kg/ha/semana fructificación', unidad:'Saco 25 Kg', proveedor:'Yara México' },
+  { nombre:'YaraTera® Deltaspray™ 15-15-30', ingredienteActivo:'N 15% + P2O5 15% + K2O 30% + microelementos', categoria:'Nutrición vegetal / Fertilizante NPK de producción', tipoProblema:'Deficiencia', subcategoria:'Desbalance en cosechas continuas', dosisRecomendada:'30 a 60 Kg/ha/semana desde el cuaje', unidad:'Saco 25 Kg', proveedor:'Yara México' },
+  { nombre:'YaraMila® Complex', ingredienteActivo:'N 12% + P2O5 11% + K2O 18% + MgO 2.7% + S 8% + B 0.015% + Zn 0.02%', categoria:'Nutrición vegetal / Fertilizante NPK perlado', tipoProblema:'Deficiencia', subcategoria:'Nutrición base pre-trasplante, suelo abierto', dosisRecomendada:'150 a 300 Kg/ha incorporado al preparar camas', unidad:'Saco 25 Kg', proveedor:'Yara México' },
+  { nombre:'Candor®', ingredienteActivo:'Extracto de cítricos 24% + extracto de canela 6.70%', categoria:'Bioinsecticida / Acaricida botánico', tipoProblema:'Plaga', subcategoria:'Araña roja, pulgones, mosquita blanca', dosisRecomendada:'2.0 a 4.0 ml/L de agua', unidad:'Envase 1 L', proveedor:'Syngenta México' },
+  { nombre:'Bio Cinnamon®', ingredienteActivo:'Extracto de canela 15% (151.8 g/L)', categoria:'Insecticida / Acaricida botánico', tipoProblema:'Plaga', subcategoria:'Trips de las flores, ácaros', dosisRecomendada:'1.0 a 2.0 L/ha con coadyuvante humectante', unidad:'Envase 1 L / garrafa 5 L', proveedor:'PortalTecnoagrícola' },
+  { nombre:'Neem CE 80®', ingredienteActivo:'Aceite de Neem (80.00% concentrado emulsionable)', categoria:'Insecticida / Acaricida orgánico regulador de crecimiento', tipoProblema:'Plaga', subcategoria:'Drosophila suzukii, trips, orugas', dosisRecomendada:'2.0 a 3.0 L/ha cubriendo el envés', unidad:'Envase 1 L', proveedor:'Interagro México' },
+  { nombre:'Cinnacar®', ingredienteActivo:'Extracto de canela 40% + jabón potásico 60%', categoria:'Insecticida botánico de contacto y lavado', tipoProblema:'Plaga', subcategoria:'Pulgones, piojos harinosos, esporas de cenicilla', dosisRecomendada:'5.0 ml/L de agua', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Promotora Técnica Industrial' },
+  { nombre:'Proganic® Neem', ingredienteActivo:'Aceite esencial de semilla de Neem (80.00%)', categoria:'Insecticida biológico preventivo', tipoProblema:'Plaga', subcategoria:'Araña roja, minadores foliares, trips', dosisRecomendada:'1.0-1.5 ml/L preventivo, 2.5 ml/L ante brote', unidad:'Envase 1 L / porrón 20 L', proveedor:'Soluciones Naturales Pro México' },
+  { nombre:'Alisin®', ingredienteActivo:'Extracto de ajo 45% + extracto de chile 45%', categoria:'Insecticida / Repelente orgánico botánico', tipoProblema:'Plaga', subcategoria:'Trips, mosquita blanca, pulgones', dosisRecomendada:'1.0 a 2.0 L/ha preventivo', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Grupo Fagro' },
+  { nombre:'Bio-Gobernadora®', ingredienteActivo:'Extracto de Gobernadora (20.00% / 200 g/L)', categoria:'Fungicida e inductor de resistencia orgánico', tipoProblema:'Hongo', subcategoria:'Botrytis, Antracnosis, secadera de raíz', dosisRecomendada:'1.5 a 3.0 L/ha fertirriego radicular o foliar', unidad:'Envase 1 L / garrafa 5 L', proveedor:'PortalTecnoagrícola' },
+  { nombre:'Capsiflash®', ingredienteActivo:'Capsaicina 15% + extracto de mostaza 5%', categoria:'Repelente / Insecticida de choque botánico', tipoProblema:'Plaga', subcategoria:'Gusano soldado, trips', dosisRecomendada:'0.5 a 1.0 L/ha diluido', unidad:'Envase 1 L', proveedor:'AgroScience' },
+  { nombre:'Ultrasol® Desarrollo (18-18-18)', ingredienteActivo:'N 18% + P2O5 18% + K2O 18% + microelementos', categoria:'Nutrición vegetal / Fertilizante NPK de equilibrio', tipoProblema:'Deficiencia', subcategoria:'Retraso de brotes, coronas débiles, tallos cortos', dosisRecomendada:'30 a 50 Kg/ha/semana fertirriego', unidad:'Saco 25 Kg', proveedor:'SQM México' },
+  { nombre:'YaraTera® Krista™ MAP', ingredienteActivo:'N amoniacal 12% + P2O5 61%', categoria:'Nutrición vegetal / Fertilizante simple concentrado', tipoProblema:'Deficiencia', subcategoria:'Deficiencia crítica de fósforo, raíces secundarias', dosisRecomendada:'10 a 25 Kg/ha/semana en establecimiento', unidad:'Saco 25 Kg', proveedor:'Yara México' },
+  { nombre:'Folitron®', ingredienteActivo:'N 12% + Fe 1% + Mn 0.5% + Zn 0.5% + aminoácidos', categoria:'Nutrición vegetal / Bioestimulante foliar de choque', tipoProblema:'', subcategoria:'Clorosis por encharcamiento, heladas o toxicidad radicular', dosisRecomendada:'1.0 a 2.0 L/ha foliar', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Grupo Versa' },
+  { nombre:'Agromil® Plus', ingredienteActivo:'Citocininas 0.04% + complejo polivitamínico 0.05%', categoria:'Nutrición vegetal / Regulador de crecimiento', tipoProblema:'', subcategoria:'Frutos pequeños, mala brotación lateral', dosisRecomendada:'0.5 a 1.0 L/ha prefloración y amarre', unidad:'Envase 1 L', proveedor:'Poliagro' },
+  { nombre:'Ergostim® XL', ingredienteActivo:'AATC 5% + Ácido fólico 0.10%', categoria:'Nutrición vegetal / Bioestimulante metabólico antiestrés', tipoProblema:'', subcategoria:'Detención de crecimiento por choque climático', dosisRecomendada:'0.5 a 1.0 L/ha en máxima demanda fenológica', unidad:'Envase 1 L', proveedor:'Arysta LifeScience / UPL México' },
+  { nombre:'Radigrow®', ingredienteActivo:'Extractos auxínicos 2% + P2O5 15% + Zn quelatado 1%', categoria:'Nutrición vegetal / Enraizador orgánico concentrado', tipoProblema:'', subcategoria:'Raíces adventicias post-trasplante, anclaje', dosisRecomendada:'1.0 a 2.0 L/ha goteo/drench en corona', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Poliagro' },
+  { nombre:'Agromil® V', ingredienteActivo:'Citocininas 0.01% + Auxinas 0.005% + Giberelinas 0.005% + aminoácidos', categoria:'Nutrición vegetal / Bioestimulante multihormonal', tipoProblema:'', subcategoria:'Crecimiento desequilibrado de brotes', dosisRecomendada:'1.0 a 1.5 L/ha cubriendo todo el dosel', unidad:'Envase 1 L / garrafa 5 L', proveedor:'Poliagro' },
+  { nombre:'Nitro-Soli® (20-20-20)', ingredienteActivo:'N 20% + P2O5 20% + K2O 20% + microelementos', categoria:'Nutrición vegetal / Fertilizante NPK alta concentración', tipoProblema:'Deficiencia', subcategoria:'Deficiencias simultáneas de macronutrientes', dosisRecomendada:'20 a 40 Kg/ha/semana fertirriego', unidad:'Saco 25 Kg', proveedor:'Comercializadoras e importadoras nacionales' }
+];
+
+// Importa el catálogo completo del proveedor a Inventario. Todo se marca
+// como "Sin stock / por comprar" por default (es un catálogo de lo que SE
+// PUEDE comprar, no lo que ya tienes físicamente) — tú después marcas como
+// "En bodega" lo que sí tengas. No duplica si ya existe un insumo con el
+// mismo nombre.
+function importarCatalogoProveedor(){
+  const yaExistentes = new Set(inventario.map(i => i.nombre));
+  const nuevos = CATALOGO_PROVEEDOR.filter(p => !yaExistentes.has(p.nombre));
+  if(nuevos.length === 0){ alert('Los productos del catálogo ya están todos cargados en tu inventario.'); return; }
+  if(!confirm('Esto va a agregar ' + nuevos.length + ' productos nuevos a tu Inventario, todos marcados como "Sin stock / por comprar". ¿Continuar?')) return;
+  nuevos.forEach(p => {
+    const insumo = Object.assign({ id: generarId(), creado: Date.now(), estado:'Sin stock', evaluacion:'', dosisAplicada:'', precio:'' }, p);
+    inventario.unshift(insumo);
+    fsGuardarItem('inventario', insumo);
+  });
+  pintarInventario();
+  buscarFitosanitario();
+  alert(nuevos.length + ' productos agregados a tu Inventario. Ya puedes marcar como "En bodega" los que sí tengas físicamente, y completar precio en cada uno.');
+}
+
+// ---------- CONTROL BIOLÓGICO: insectos benéficos (referencia) ----------
+const BENEFICOS_INFO = [
+  { grupo:'Ácaros depredadores', color:'#3D7EA6', items:[
+    { nombre:'Phytoseiulus persimilis', controla:'Araña roja (Tetranychus urticae), especialmente focos activos.', alimentacion:'Se alimenta principalmente de ácaros presa; depende de que haya araña roja.', uso:'Usar como refuerzo en focos confirmados. Puede perderse si no hay presas.', incompatible:'Sin conflicto documentado relevante en esta lista.' },
+    { nombre:'Neoseiulus californicus', controla:'Araña roja.', alimentacion:'Ácaros fitófagos; tolera mejor periodos de baja presa que P. persimilis.', uso:'Candidato para prevención/mantenimiento, según temperatura y etiqueta.', incompatible:'Orius laevigatus puede depredarlo si escasea su presa principal (precaución, no exclusión total).' },
+    { nombre:'Amblyseius andersoni', controla:'Determinados ácaros fitófagos, incluida araña roja.', alimentacion:'Pequeñas presas; algunas poblaciones aprovechan polen.', uso:'Valorar como preventivo solo si la ficha del producto y las condiciones del túnel lo respaldan.', incompatible:'Mismo patrón que los demás fitoseidos frente a Orius laevigatus.' },
+    { nombre:'Neoseiulus cucumeris', controla:'Larvas jóvenes de trips.', alimentacion:'Larvas de trips y, según el producto/sistema, alimento alternativo.', uso:'Preventivo o al inicio de trips; revisar temperatura y humedad.', incompatible:'⚠️ Orius laevigatus — el caso mejor documentado (incluso estudiado en fresa): Orius se come activamente a N. cucumeris cuando escasea el trips. Sigue siendo usable junto, pero dar polen de refuerzo y vigilar proporciones.' },
+    { nombre:'Amblyseius swirskii', controla:'Huevos/estados jóvenes de mosca blanca y trips; también algunas presas pequeñas.', alimentacion:'Presas pequeñas y polen/alimento complementario en ciertos programas.', uso:'Más adecuado en condiciones cálidas; comprobar temperaturas reales de noche y día.', incompatible:'⚠️ Orius laevigatva — varios estudios muestran caída de su población cuando se libera junto con Orius.' },
+    { nombre:'Amblyseius degenerans', controla:'Trips, como parte de un programa combinado.', alimentacion:'Larvas de trips y polen.', uso:'Complemento posible; confirmar disponibilidad y recomendaciones locales.', incompatible:'Orius laevigatus (mismo mecanismo de depredación que cucumeris/swirskii).' },
+    { nombre:'Feltiella acarisuga', controla:'Araña roja y otros ácaros fitófagos.', alimentacion:'Las larvas depredan ácaros; los adultos pueden aprovechar fuentes azucaradas.', uso:'Puede ayudar en focos de araña roja; necesita presas para reproducirse.', incompatible:'Sin conflicto documentado relevante en esta lista.' }
+  ]},
+  { grupo:'Parasitoides y depredadores de pulgones', color:'#2F8F72', items:[
+    { nombre:'Aphidius colemani', controla:'Ciertas especies de pulgón pequeño.', alimentacion:'Las larvas se desarrollan dentro del pulgón; adultos pueden usar fuentes azucaradas.', uso:'Elegir solo tras identificar que el pulgón hospedador es susceptible.', incompatible:'Ninguno específico — se complementa con Aphidius ervi (de ahí el "Aphidius-Mix"), cada uno ataca pulgones de tamaño distinto.' },
+    { nombre:'Aphidius ervi', controla:'Ciertas especies de pulgón de mayor tamaño.', alimentacion:'Pulgones hospedadores; azúcares para adultos pueden ayudar.', uso:'Confirmar especie de pulgón antes de comprar.', incompatible:'Compatible y complementario con A. colemani.' },
+    { nombre:'Aphelinus abdominalis', controla:'Determinados pulgones.', alimentacion:'Parasita pulgones; la hembra también puede alimentarse de ellos.', uso:'Uso dirigido a pulgones compatibles.', incompatible:'Sin conflicto documentado relevante en esta lista.' },
+    { nombre:'Aphidoletes aphidimyza', controla:'Pulgones.', alimentacion:'Las larvas consumen pulgones; los adultos pueden aprovechar azúcares.', uso:'Necesita colonias de pulgón y condiciones adecuadas; puede complementar parasitoides.', incompatible:'Ninguno grave — su feromona de alarma incluso puede reducir la depredación de Orius sobre otros insectos.' },
+    { nombre:'Chrysopa / Chrysoperla spp. (crisopas)', controla:'Pulgones y otros insectos pequeños, según especie y etapa.', alimentacion:'Principalmente las larvas son depredadoras; dieta adulta varía por especie.', uso:'Depredador generalista; comprobar especie y producto exactos.', incompatible:'⚠️ Generalista — puede comerse pulgones ya parasitados (momias) de Aphidius, reduciendo su efectividad si escasea la plaga disponible.' }
+  ]},
+  { grupo:'Mosca blanca', color:'#B9812E', items:[
+    { nombre:'Encarsia formosa', controla:'Mosca blanca susceptible, especialmente ciertas especies de invernadero.', alimentacion:'Las larvas parasitan ninfas; los adultos pueden alimentarse de estados jóvenes.', uso:'Liberar cuando haya ninfas susceptibles; confirmar especie de mosca blanca.', incompatible:'✅ Compatible con Eretmocerus eremicus — de hecho se vende como combo comercial ("Eretmix"): Encarsia prefiere temperaturas bajas y Eretmocerus altas, se complementan.' },
+    { nombre:'Eretmocerus eremicus', controla:'Ciertas especies de mosca blanca.', alimentacion:'Parasitoide de ninfas; las hembras también pueden alimentarse de la plaga.', uso:'Alternativa según la especie de mosca blanca y el clima.', incompatible:'Compatible con Encarsia formosa (ver arriba).' },
+    { nombre:'Amblyseius swirskii (mosca blanca)', controla:'Puede depredar huevos y estados jóvenes de mosca blanca.', alimentacion:'Presas pequeñas y polen en determinados programas.', uso:'Complemento, no sustituto automático de parasitoides.', incompatible:'Orius laevigatus (ver sección de ácaros depredadores).' }
+  ]},
+  { grupo:'Minadores', color:'#8A5FA8', items:[
+    { nombre:'Diglyphus isaea', controla:'Larvas de ciertos minadores de hojas.', alimentacion:'Larvas de minador; también puede matar larvas por alimentación directa.', uso:'Liberar solo si se observan minas activas y se confirma un minador susceptible.', incompatible:'✅ Compatible con Dacnusa sibirica — combo estándar en la industria (Dacnusa mejor en frío <20°C, Diglyphus mejor en calor >25°C, se complementan por temporada). ⚠️ La Abamectina (Avalanch®, Abamectina Dragón de tu inventario) es dañina para Diglyphus — evita aplicarla cerca de la liberación.' },
+    { nombre:'Dacnusa sibirica', controla:'Larvas de ciertos minadores.', alimentacion:'Se desarrolla como parasitoide en larvas hospedadoras.', uso:'No es una compra preventiva prioritaria sin evidencia de minador.', incompatible:'Compatible con Diglyphus isaea (ver arriba). ⚠️ También sensible a Abamectina.' }
+  ]},
+  { grupo:'Otros depredadores', color:'#A63D5C', items:[
+    { nombre:'Orius laevigatus', controla:'Trips, especialmente en flores; también otras presas pequeñas.', alimentacion:'Insectos presa y, en ciertas condiciones, polen.', uso:'Puede complementar el control de trips en floración; comprobar presencia y compatibilidad.', incompatible:'⚠️ Es la pieza "conflictiva" de todo el sistema — depreda a los ácaros fitoseidos (cucumeris, swirskii, degenerans, californicus) cuando escasea el trips. Dale polen/alimento suplementario y evita soltarlo justo donde/cuando sueltes esos ácaros.' },
+    { nombre:'Cryptolaemus montrouzieri', controla:'Cochinillas harinosas susceptibles.', alimentacion:'Adultos y larvas comen cochinillas y huevos.', uso:'Usar solo si se confirma cochinilla adecuada.', incompatible:'Sin conflicto documentado relevante en esta lista.' },
+    { nombre:'Atheta coriaria (Dalotia coriaria)', controla:'Ciertos insectos del sustrato, incluidas larvas de mosquitas y algunas pupas de trips.', alimentacion:'Pequeños organismos del suelo/sustrato.', uso:'En suelo directo, verificar con el proveedor que el producto sea adecuado para el sistema.', incompatible:'Sin conflicto documentado relevante en esta lista.' },
+    { nombre:'Anagyrus vladimiri', controla:'Ciertas cochinillas harinosas.', alimentacion:'La larva se desarrolla en la cochinilla hospedadora.', uso:'Confirmar la identificación de la cochinilla y el nombre comercial vigente.', incompatible:'Sin conflicto documentado relevante en esta lista.' }
+  ]},
+  { grupo:'Productos auxiliares y monitoreo', color:'#6B7A8F', items:[
+    { nombre:'Aphidius-Mix-System', controla:'Mezcla comercial de parasitoides para ciertas especies de pulgón.', alimentacion:'Depende de los parasitoides incluidos.', uso:'Verificar composición exacta de la presentación disponible en México.', incompatible:'—' },
+    { nombre:'Eretmix-System', controla:'Mezcla comercial de parasitoides para mosca blanca, según la presentación.', alimentacion:'Depende de las especies incluidas.', uso:'Verificar composición exacta y compatibilidad.', incompatible:'—' },
+    { nombre:'Nutrimite', controla:'No controla plagas directamente: alimento complementario a base de polen seleccionado para ciertos ácaros depredadores.', alimentacion:'Alimento suplementario.', uso:'Usar únicamente con las especies y dosis indicadas en la etiqueta.', incompatible:'Útil precisamente para reducir el conflicto Orius vs. ácaros depredadores.' },
+    { nombre:'Trampas adhesivas amarillas/azules', controla:'Monitoreo/captura de insectos voladores como mosca blanca, trips y pulgones alados.', alimentacion:'No aplica.', uso:'Colocar y revisar periódicamente.', incompatible:'⚠️ Pueden capturar benéficos voladores (Orius, Encarsia, Eretmocerus adultos) si se usan indiscriminadamente — colocar lejos de puntos de liberación reciente.' }
+  ]}
+];
+
+const DECISION_PLAGA = [
+  { plaga:'Araña roja', organismos:'N. californicus; P. persimilis en focos; valorar Feltiella.', nota:'Mirar el envés y registrar focos; no esperar a que haya telarañas generalizadas.' },
+  { plaga:'Trips', organismos:'N. cucumeris; A. swirskii si hay calor; Orius en flores.', nota:'Revisar flores y capturas; las trampas solas no indican la infestación completa.' },
+  { plaga:'Mosca blanca', organismos:'Encarsia o Eretmocerus según especie; Swirskii como complemento.', nota:'Identificar especie y observar ninfas bajo las hojas.' },
+  { plaga:'Pulgones', organismos:'Aphidius/Aphidius-Mix según especie; Aphidoletes o crisopas como apoyo.', nota:'Identificar el pulgón hospedador.' },
+  { plaga:'Minadores', organismos:'Diglyphus o Dacnusa según especie.', nota:'Solo con minas activas y larvas presentes.' },
+  { plaga:'Mosquitas del suelo', organismos:'Evaluar Atheta coriaria si el proveedor confirma idoneidad.', nota:'Revisar larvas en la zona radicular y manejo de humedad.' },
+  { plaga:'Cochinillas', organismos:'Cryptolaemus o parasitoide compatible.', nota:'Confirmar que la plaga esté presente y qué especie es.' }
+];
+
+// Lista aplanada de los 19 organismos benéficos, para que el buscador de
+// Inventario (por problemática) los pueda encontrar junto con los
+// productos normales. No se muestran en ningún listado fijo — solo
+// aparecen como resultado de una búsqueda.
+const BENEFICOS_FLAT = [];
+BENEFICOS_INFO.forEach(grupo => {
+  grupo.items.forEach(it => {
+    BENEFICOS_FLAT.push({
+      nombre: it.nombre,
+      categoria: 'Control biológico — ' + grupo.grupo,
+      subcategoria: it.controla,
+      controla: it.controla,
+      alimentacion: it.alimentacion,
+      uso: it.uso,
+      incompatible: it.incompatible,
+      color: grupo.color
+    });
+  });
+});
+
+// Dado el nombre de una plaga (texto libre), regresa la fila de la tabla
+// de decisión correspondiente, si existe. Se usa dentro del buscador.
+function notaDecisionPlaga(texto){
+  const t = texto.toLowerCase();
+  const fila = DECISION_PLAGA.find(d => d.plaga.toLowerCase().includes(t) || t.includes(d.plaga.toLowerCase()));
+  return fila || null;
+}
+
+// ---------- CATÁLOGO ANSA (ansa.ag/productos) ----------
+// Nota: ANSA no publica dosis exacta ni "problema que atiende" en su
+// catálogo público (solo nombre + ingrediente activo + marca), así que
+// esos dos campos se completaron con conocimiento agronómico general y
+// la dosis queda como "Consultar ficha técnica ANSA" en vez de inventar
+// un número. Filtrado para incluir solo lo relevante a invernadero de
+// fresa (se excluyeron herbicidas de campo abierto, semillas de otras
+// hortalizas, raticidas y equipo de dron).
+const CATALOGO_ANSA = [
+  { nombre:'Acramite 50 PH', ingredienteActivo:'Bifenazate', categoria:'Acaricida de contacto', tipoProblema:'Plaga', subcategoria:'Araña roja y otros ácaros', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'UPL Agro (ANSA)' },
+  { nombre:'Acarout', ingredienteActivo:'Spirodiclofen', categoria:'Acaricida de contacto y translaminar', tipoProblema:'Plaga', subcategoria:'Araña roja (huevos y adultos)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'AMVAC (ANSA)' },
+  { nombre:'Envidor', ingredienteActivo:'Spirodiclofen 20.56% + Abamectina 1.67%', categoria:'Acaricida de contacto y translaminar', tipoProblema:'Plaga', subcategoria:'Araña roja, todas las fases', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Gowan (ANSA)' },
+  { nombre:'Adobe', ingredienteActivo:'Fenpiroximato 5.04%', categoria:'Acaricida', tipoProblema:'Plaga', subcategoria:'Araña roja', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'UPL Agro (ANSA)' },
+  { nombre:'Magister', ingredienteActivo:'Fenazaquin', categoria:'Acaricida', tipoProblema:'Plaga', subcategoria:'Araña roja', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Gowan (ANSA)' },
+  { nombre:'Koromite 1%Ce', ingredienteActivo:'Milbemectina', categoria:'Acaricida / Insecticida translaminar', tipoProblema:'Plaga', subcategoria:'Ácaros y minadores foliares', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Gowan (ANSA)' },
+  { nombre:'Danisaraba', ingredienteActivo:'Cyflumetofen', categoria:'Acaricida de contacto específico', tipoProblema:'Plaga', subcategoria:'Araña roja (alta selectividad)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Summit Agro (ANSA)' },
+  { nombre:'Beleaf', ingredienteActivo:'Flonicamid', categoria:'Insecticida sistémico', tipoProblema:'Plaga', subcategoria:'Pulgones', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'FMC (ANSA)' },
+  { nombre:'Avaunt', ingredienteActivo:'Indoxacarb', categoria:'Insecticida de contacto e ingestión', tipoProblema:'Plaga', subcategoria:'Larvas de lepidópteros', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'FMC (ANSA)' },
+  { nombre:'Confirm', ingredienteActivo:'Tebufenozide', categoria:'Insecticida regulador de crecimiento de insectos', tipoProblema:'Plaga', subcategoria:'Larvas de lepidópteros', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Summit Agro (ANSA)' },
+  { nombre:'Milini', ingredienteActivo:'Beauveria bassiana', categoria:'Insecticida biológico / hongo entomopatógeno', tipoProblema:'Plaga', subcategoria:'Trips, mosquita blanca, ácaros', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'AMVAC (ANSA)' },
+  { nombre:'Akorde', ingredienteActivo:'Bacillus amyloliquefaciens', categoria:'Fungicida biológico', tipoProblema:'Hongo', subcategoria:'Hongos foliares, cenicilla', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'AMVAC (ANSA)' },
+  { nombre:'Double Nickel', ingredienteActivo:'Bacillus amyloliquefaciens cepa D747', categoria:'Fungicida biológico', tipoProblema:'Hongo', subcategoria:'Botrytis, hongos foliares', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Summit Agro (ANSA)' },
+  { nombre:'Fragata', ingredienteActivo:'Trichoderma harzianum', categoria:'Fungicida biológico / inoculante de suelo', tipoProblema:'Hongo', subcategoria:'Fusarium, Rhizoctonia, Pythium (raíz)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'AMVAC (ANSA)' },
+  { nombre:'PHC T-22', ingredienteActivo:'Trichoderma harzianum cepa T-22', categoria:'Fungicida biológico / inoculante de suelo', tipoProblema:'Hongo', subcategoria:'Patógenos de raíz (preventivo en trasplante)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'PI (ANSA)' },
+  { nombre:'Kenja', ingredienteActivo:'Isofetamid', categoria:'Fungicida de contacto específico', tipoProblema:'Hongo', subcategoria:'Botrytis cinerea', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Summit Agro (ANSA)' },
+  { nombre:'Katsu 5% Ew', ingredienteActivo:'Ciflufenamid', categoria:'Fungicida específico', tipoProblema:'Hongo', subcategoria:'Cenicilla (oídio)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Summit Agro (ANSA)' },
+  { nombre:'Kusabi', ingredienteActivo:'Pyriofenone 27.3%', categoria:'Fungicida específico', tipoProblema:'Hongo', subcategoria:'Cenicilla (oídio)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'FMC (ANSA)' },
+  { nombre:'Investor', ingredienteActivo:'Fenhexamid + Fludioxonil', categoria:'Fungicida de contacto combinado', tipoProblema:'Hongo', subcategoria:'Botrytis cinerea', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Anasac (ANSA)' },
+  { nombre:'Masori', ingredienteActivo:'Propamocarb clorhidrato', categoria:'Fungicida sistémico', tipoProblema:'Hongo', subcategoria:'Phytophthora, mildius', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'UPL Agro (ANSA)' },
+  { nombre:'Consento', ingredienteActivo:'Propamocarb clorhidrato + Fenamidona', categoria:'Fungicida sistémico combinado', tipoProblema:'Hongo', subcategoria:'Phytophthora, mildius', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Gowan (ANSA)' },
+  { nombre:'Fontelis 20 Sc', ingredienteActivo:'Pentiopirad', categoria:'Fungicida sistémico', tipoProblema:'Hongo', subcategoria:'Botrytis, Antracnosis', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Corteva (ANSA)' },
+  { nombre:'Curzate60 Df', ingredienteActivo:'Cymoxanil', categoria:'Fungicida sistémico', tipoProblema:'Hongo', subcategoria:'Mildius, Phytophthora', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Corteva (ANSA)' },
+  { nombre:'Cueva', ingredienteActivo:'Octanoato de cobre', categoria:'Fungicida / Bactericida de contacto', tipoProblema:'Hongo', subcategoria:'Antracnosis, mancha bacteriana', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Summit Agro (ANSA)' },
+  { nombre:'Phyton 27', ingredienteActivo:'Sulfato de cobre', categoria:'Fungicida / Bactericida de contacto', tipoProblema:'Hongo', subcategoria:'Mancha bacteriana, antracnosis', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'IMEX (ANSA)' },
+  { nombre:'ADIC HI-CU', ingredienteActivo:'Hidróxido de cobre', categoria:'Fungicida / Bactericida de contacto', tipoProblema:'Hongo', subcategoria:'Antracnosis, mancha bacteriana', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Cobres ANSA' },
+  { nombre:'ADICOB', ingredienteActivo:'Oxicloruro de cobre', categoria:'Fungicida / Bactericida de contacto', tipoProblema:'Hongo', subcategoria:'Antracnosis, mildius', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Cobres ANSA' },
+  { nombre:'Agry-Gent', ingredienteActivo:'Sulfato de gentamicina + Oxicloruro de cobre', categoria:'Bactericida sistémico', tipoProblema:'Hongo', subcategoria:'Mancha bacteriana', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Summit Agro (ANSA)' },
+  { nombre:'Final Bacter', ingredienteActivo:'Sulfato de gentamicina + Oxitetraciclina', categoria:'Bactericida sistémico', tipoProblema:'Hongo', subcategoria:'Tizón bacteriano', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Gowan (ANSA)' },
+  { nombre:'Brexil Ca', ingredienteActivo:'Ca 20% + B 0.5%', categoria:'Nutrición vegetal / Corrector de microelementos', tipoProblema:'Deficiencia', subcategoria:'Calcio y Boro', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'Brexil Combi', ingredienteActivo:'Cobre, Hierro, Magnesio, Zinc acomplejados', categoria:'Nutrición vegetal / Corrector de microelementos', tipoProblema:'Deficiencia', subcategoria:'Micronutrientes múltiples', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'Brexil Mix', ingredienteActivo:'Mg 6% + B 1.2% + Cu 0.8% + Fe 0.6% + Mn 0.7% + Mo 1% + Zn 5%', categoria:'Nutrición vegetal / Corrector de microelementos', tipoProblema:'Deficiencia', subcategoria:'Micronutrientes múltiples', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'Calbit C', ingredienteActivo:'Calcio acomplejado por ligninsulfonato', categoria:'Nutrición vegetal / Corrector de calcio', tipoProblema:'Deficiencia', subcategoria:'Calcio', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'Boroplus', ingredienteActivo:'Boro complejado', categoria:'Nutrición vegetal / Corrector de boro', tipoProblema:'Deficiencia', subcategoria:'Boro (floración, aborto floral)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'Plantafol 20-20-20', ingredienteActivo:'N-P-K 20-20-20 + micronutrientes quelatados', categoria:'Nutrición vegetal / Fertilizante foliar NPK', tipoProblema:'Deficiencia', subcategoria:'Balance general NPK', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'Plantafol 10-54-10', ingredienteActivo:'N 10% + P alto + K + micronutrientes', categoria:'Nutrición vegetal / Fertilizante foliar de arranque', tipoProblema:'Deficiencia', subcategoria:'Fósforo, arranque radicular', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'Plantafol 5-15-45', ingredienteActivo:'N 5% + P 15% + K 45% + micronutrientes', categoria:'Nutrición vegetal / Fertilizante foliar de llenado', tipoProblema:'Deficiencia', subcategoria:'Potasio, llenado de fruto', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'K-Fol', ingredienteActivo:'P2O5 20% + K2O 55% (cristales solubles)', categoria:'Nutrición vegetal / Fertilizante foliar', tipoProblema:'Deficiencia', subcategoria:'Potasio y fósforo', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'UPL Agro (ANSA)' },
+  { nombre:'Humistar Wg', ingredienteActivo:'Ácidos húmicos y fúlvicos', categoria:'Nutrición vegetal / Mejorador orgánico de suelo', tipoProblema:'', subcategoria:'Estructura de suelo, retención de nutrientes', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Rovensa Next (ANSA)' },
+  { nombre:'Poliquel Boro', ingredienteActivo:'Boro quelatado', categoria:'Nutrición vegetal / Corrector de boro', tipoProblema:'Deficiencia', subcategoria:'Boro (floración)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'UPL Agro (ANSA)' },
+  { nombre:'Poliquel Zinc', ingredienteActivo:'Zinc quelatado', categoria:'Nutrición vegetal / Corrector de zinc', tipoProblema:'Deficiencia', subcategoria:'Zinc (brotación, auxinas)', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'UPL Agro (ANSA)' },
+  { nombre:'Brandt 10% Zn', ingredienteActivo:'Zinc 10% + Azufre 5%', categoria:'Nutrición vegetal / Corrector de zinc', tipoProblema:'Deficiencia', subcategoria:'Zinc', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'IMEX (ANSA)' },
+  { nombre:'Bioamin', ingredienteActivo:'Aminoácidos', categoria:'Nutrición vegetal / Bioestimulante', tipoProblema:'', subcategoria:'Antiestrés general', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'AMVAC (ANSA)' },
+  { nombre:'Delfan Plus', ingredienteActivo:'Aminoácidos', categoria:'Nutrición vegetal / Bioestimulante', tipoProblema:'', subcategoria:'Antiestrés general', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Rovensa Next (ANSA)' },
+  { nombre:'Megafol', ingredienteActivo:'N total 3% + Potasio 8% + Carbono orgánico 9%', categoria:'Nutrición vegetal / Bioestimulante antiestrés', tipoProblema:'', subcategoria:'Recuperación tras estrés climático', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'Actiwave', ingredienteActivo:'N orgánico + Potasio + Carbono orgánico + Hierro + Zinc', categoria:'Nutrición vegetal / Bioestimulante radicular', tipoProblema:'', subcategoria:'Estrés post-trasplante', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Syngenta (ANSA)' },
+  { nombre:'PHC Healthy Start', ingredienteActivo:'N-P-K + Fe + Cu + Mn + Zn', categoria:'Nutrición vegetal / Fertilizante de arranque', tipoProblema:'Deficiencia', subcategoria:'Arranque post-trasplante', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'PI (ANSA)' },
+  { nombre:'PHC Yuccah', ingredienteActivo:'Extractos de Yucca schidigera', categoria:'Coadyuvante / Mejorador de absorción', tipoProblema:'', subcategoria:'Mejora penetración de agua y nutrientes en suelo', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'PI (ANSA)' },
+  { nombre:'Indicate', ingredienteActivo:'Ácido fosfórico', categoria:'Coadyuvante / Acidificante de agua', tipoProblema:'', subcategoria:'Corrección de pH del agua de mezcla', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'IMEX (ANSA)' },
+  { nombre:'Joshi', ingredienteActivo:'N-P-K + aminoácidos + citocininas', categoria:'Nutrición vegetal / Bioestimulante hormonal', tipoProblema:'', subcategoria:'Amarre y calidad de fruto', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'Summit Agro (ANSA)' },
+  { nombre:'Colmena Abejorros', ingredienteActivo:'Bombus ephippiatus (abejorro nativo)', categoria:'Polinización / Insumo biológico', tipoProblema:'', subcategoria:'Polinización en invernadero cerrado', dosisRecomendada:'Consultar ficha tecnica ANSA', unidad:'Consultar con ANSA', proveedor:'IMEX (ANSA)' }
+];
+
+function importarCatalogoAnsa(){
+  const yaExistentes = new Set(inventario.map(i => i.nombre));
+  const nuevos = CATALOGO_ANSA.filter(p => !yaExistentes.has(p.nombre));
+  if(nuevos.length === 0){ alert('Los productos de ANSA ya están todos cargados en tu inventario.'); return; }
+  if(!confirm('Esto va a agregar ' + nuevos.length + ' productos nuevos de ANSA a tu Inventario, marcados como "Sin stock / por comprar". ¿Continuar?')) return;
+  nuevos.forEach(p => {
+    const insumo = Object.assign({ id: generarId(), creado: Date.now(), estado:'Sin stock', evaluacion:'', dosisAplicada:'', precio:'' }, p);
+    inventario.unshift(insumo);
+    fsGuardarItem('inventario', insumo);
+  });
+  pintarInventario();
+  buscarFitosanitario();
+  alert(nuevos.length + ' productos de ANSA agregados a tu Inventario.');
+}
+
+// ---------- PROGRAMA DE ALIMENTACIÓN ----------
+let editingAlimIndex = null;
+
+function poblarSelectEtapaAlim(seleccionar){
+  const sel = document.getElementById('alimEtapa');
+  if(!sel) return;
+  sel.innerHTML = ETAPAS.map(e => `<option value="${e.nombre}" ${e.nombre===seleccionar?'selected':''}>${e.nombre}</option>`).join('');
+}
+
+function guardarPlanAlimentacion(){
+  const producto = document.getElementById('alimProducto').value.trim();
+  if(!producto){ alert('Escribe el nombre del producto/fertilizante.'); return; }
+  if(!bloquearEnvioBreve('alimentacion')) return;
+  const semanaDesde = Number(document.getElementById('alimSemanaDesde').value) || 0;
+  const semanaHastaRaw = document.getElementById('alimSemanaHasta').value;
+  const datos = {
+    etapa: document.getElementById('alimEtapa').value,
+    semanaDesde,
+    semanaHasta: semanaHastaRaw !== '' ? Number(semanaHastaRaw) : semanaDesde,
+    producto,
+    dosis: document.getElementById('alimDosis').value,
+    frecuencia: document.getElementById('alimFrecuencia').value,
+    notas: document.getElementById('alimNotas').value
+  };
+  let linea;
+  if(editingAlimIndex !== null){
+    const idx = planAlimentacion.findIndex(x => x.id === editingAlimIndex);
+    if(idx === -1){ cancelarEdicionPlanAlimentacion(); return; }
+    linea = Object.assign(planAlimentacion[idx], datos);
+    planAlimentacion[idx] = linea;
+  } else {
+    linea = Object.assign({ id: generarId(), creado: Date.now() }, datos);
+    planAlimentacion.push(linea);
+  }
+  fsGuardarItem('planAlimentacion', linea);
+  cancelarEdicionPlanAlimentacion();
+  pintarPlanAlimentacion();
+}
+
+function editarPlanAlimentacion(id){
+  const l = planAlimentacion.find(x => x.id === id);
+  if(!l) return;
+  poblarSelectEtapaAlim(l.etapa);
+  document.getElementById('alimSemanaDesde').value = l.semanaDesde ?? '';
+  document.getElementById('alimSemanaHasta').value = l.semanaHasta ?? '';
+  document.getElementById('alimProducto').value = l.producto || '';
+  document.getElementById('alimDosis').value = l.dosis || '';
+  document.getElementById('alimFrecuencia').value = l.frecuencia || '';
+  document.getElementById('alimNotas').value = l.notas || '';
+  editingAlimIndex = id;
+  document.getElementById('alimTitulo').textContent = 'Editar línea del programa';
+  document.getElementById('btnGuardarAlim').textContent = 'Guardar cambios';
+  document.getElementById('btnCancelarAlim').classList.remove('hidden');
+  document.getElementById('alimProducto').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function cancelarEdicionPlanAlimentacion(){
+  editingAlimIndex = null;
+  poblarSelectEtapaAlim();
+  document.getElementById('alimSemanaDesde').value = '';
+  document.getElementById('alimSemanaHasta').value = '';
+  document.getElementById('alimProducto').value = '';
+  document.getElementById('alimDosis').value = '';
+  document.getElementById('alimFrecuencia').value = '';
+  document.getElementById('alimNotas').value = '';
+  document.getElementById('alimTitulo').textContent = 'Agregar línea al programa';
+  document.getElementById('btnGuardarAlim').textContent = 'Agregar al programa';
+  document.getElementById('btnCancelarAlim').classList.add('hidden');
+}
+
+function borrarPlanAlimentacion(id){
+  if(!confirm('¿Borrar esta línea del programa de alimentación?')) return;
+  const idx = planAlimentacion.findIndex(x => x.id === id);
+  if(idx === -1) return;
+  planAlimentacion.splice(idx, 1);
+  fsBorrarItem('planAlimentacion', id);
+  if(editingAlimIndex === id) cancelarEdicionPlanAlimentacion();
+  pintarPlanAlimentacion();
+}
+
+function pintarPlanAlimentacion(){
+  const cont = document.getElementById('listaAlimentacion');
+  if(!cont) return;
+  if(!document.getElementById('alimEtapa').innerHTML) poblarSelectEtapaAlim();
+
+  if(planAlimentacion.length === 0){
+    cont.innerHTML = '<div class="empty"><div class="big">🌱</div>Todavía no hay líneas en el programa de alimentación.</div>';
+    return;
+  }
+  const ordenEtapa = ETAPAS.map(e => e.nombre);
+  const lista = planAlimentacion.slice().sort((a,b) => {
+    const diffEtapa = ordenEtapa.indexOf(a.etapa) - ordenEtapa.indexOf(b.etapa);
+    if(diffEtapa !== 0) return diffEtapa;
+    return (a.semanaDesde||0) - (b.semanaDesde||0);
+  });
+  cont.innerHTML = lista.map(l => {
+    const etapaInfoL = etapaInfo(l.etapa);
+    const semanaTxt = l.semanaHasta && l.semanaHasta !== l.semanaDesde
+      ? `Semana ${l.semanaDesde}–${l.semanaHasta}` : `Semana ${l.semanaDesde}`;
+    return `
+    <div class="entry" style="border-left-color:${etapaInfoL.color};">
+      <div class="entry-top">
+        <div>
+          <div class="entry-title">${escapeHtml(l.producto)}</div>
+          <div class="entry-meta"><span class="mapa-leyenda-dot" style="background:${etapaInfoL.color}; display:inline-block;"></span> ${escapeHtml(l.etapa)} · ${semanaTxt}</div>
+        </div>
+        <div class="entry-actions">
+          <button class="btn-ghost edit" onclick="editarPlanAlimentacion('${l.id}')">Editar</button>
+          <button class="btn-ghost" onclick="borrarPlanAlimentacion('${l.id}')">Borrar</button>
+        </div>
+      </div>
+      <div class="entry-notes">${l.dosis ? '💧 '+escapeHtml(l.dosis) : ''}${l.dosis && l.frecuencia ? ' · ' : ''}${l.frecuencia ? '🔁 '+escapeHtml(l.frecuencia) : ''}</div>
+      ${l.notas ? `<div class="entry-notes">📝 ${escapeHtml(l.notas)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
 // ---------- BUSCADOR FITOSANITARIO ----------
 function buscarFitosanitario(){
   const cont = document.getElementById('buscadorResultados');
@@ -3260,9 +4035,25 @@ function buscarFitosanitario(){
     (i.categoria||'').toLowerCase().includes(texto) ||
     (i.subcategoria||'').toLowerCase().includes(texto)
   );
+
+  // Insectos benéficos: solo aparecen como resultado de búsqueda, nunca en
+  // una lista fija. Solo tiene sentido buscarlos cuando el tipo es "Plaga"
+  // (o no se especificó tipo) y/o el texto coincide con lo que controlan.
+  let beneficos = [];
+  if(tipo === '' || tipo === 'Plaga'){
+    beneficos = BENEFICOS_FLAT.slice();
+    if(texto) beneficos = beneficos.filter(b =>
+      (b.nombre||'').toLowerCase().includes(texto) ||
+      (b.controla||'').toLowerCase().includes(texto) ||
+      (b.categoria||'').toLowerCase().includes(texto)
+    );
+    if(!texto && !tipo) beneficos = []; // sin ningún filtro, no mostrar nada (ni de inventario ni de benéficos)
+  }
+
   if(!tipo && !texto){ cont.innerHTML = '<div class="empty" style="padding:14px 4px;">Filtra por tipo de problema o escribe una palabra clave.</div>'; return; }
-  if(resultados.length === 0){ cont.innerHTML = '<div class="empty" style="padding:14px 4px;">Sin resultados.</div>'; return; }
-  cont.innerHTML = resultados.map(i => {
+  if(resultados.length === 0 && beneficos.length === 0){ cont.innerHTML = '<div class="empty" style="padding:14px 4px;">Sin resultados.</div>'; return; }
+
+  let html = resultados.map(i => {
     const enBodega = i.estado !== 'Sin stock';
     return `
     <div class="buscador-resultado">
@@ -3274,6 +4065,23 @@ function buscarFitosanitario(){
       ${i.evaluacion ? `<div class="entry-notes">📝 ${escapeHtml(i.evaluacion)}</div>` : ''}
     </div>`;
   }).join('');
+
+  if(beneficos.length > 0){
+    html += beneficos.map(b => `
+      <div class="buscador-resultado" style="border-left:4px solid ${b.color};">
+        <div class="entry-title">🐞 ${escapeHtml(b.nombre)}</div>
+        <div class="entry-meta">${escapeHtml(b.categoria)}</div>
+        <div style="margin-top:6px;">
+          <span class="stock-tag" style="color:#3D7EA6;">Control biológico (no es insumo de bodega)</span>
+        </div>
+        <div class="entry-notes">🎯 Controla: ${escapeHtml(b.controla)}</div>
+        <div class="entry-notes">📋 Uso: ${escapeHtml(b.uso)}</div>
+        ${b.incompatible && b.incompatible !== '—' ? `<div class="entry-notes" style="color:${b.incompatible.includes('⚠️') ? '#A81F3A' : '#4a4636'};">🔗 Compatibilidad: ${escapeHtml(b.incompatible)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  cont.innerHTML = html;
 }
 
 pintarLista();
