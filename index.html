@@ -245,9 +245,21 @@
   input[type=file]{ display:none; }
 
   .insumos-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
-  .insumo-row{ display:flex; gap:6px; align-items:center; }
-  .insumo-row select{ flex:1.4; padding:10px 8px; font-size:14px; }
-  .insumo-row input{ flex:1; padding:10px 8px; font-size:14px; }
+  .insumo-row{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .insumo-row input.insumo-select{ flex:1.4 1 0; min-width:0; padding:10px 8px; font-size:14px; }
+  .insumo-row input.insumo-dosis{ flex:1 1 0; min-width:0; padding:10px 8px; font-size:14px; }
+  .insumo-sugerencias{
+    flex-basis:100%; background:#fff; border:1px solid var(--linea);
+    border-radius:10px; overflow:hidden;
+  }
+  .insumo-opt{ padding:9px 10px; border-bottom:1px solid var(--crema-2); cursor:pointer; }
+  .insumo-opt:last-child{ border-bottom:none; }
+  .insumo-opt:active{ background:var(--crema-2); }
+  .insumo-opt-nombre{ font-size:13.5px; font-weight:700; color:var(--tinta); }
+  .insumo-opt-meta{ font-size:11px; color:#8a8270; margin-top:1px; }
+  .insumo-opt-libre{ background:#E6F0E3; }
+  .insumo-opt-libre .insumo-opt-nombre{ color:#33502D; }
+  .insumo-sin-resultados{ padding:9px 10px; font-size:12px; color:#8a8270; border-bottom:1px solid var(--crema-2); }
   .insumo-quitar{
     background:#f4e2e2; border:none; color:#a33; border-radius:8px;
     width:36px; height:38px; font-weight:700; flex-shrink:0; font-size:15px;
@@ -1114,23 +1126,54 @@ let planAlimentacion = [];
 let inventario = [];
 let editingInsumoIndex = null;
 
+// Quita acentos y mayúsculas para comparar/buscar texto sin fallar por "é" vs "e".
+function normTxt(s){
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+// Devuelve hasta 8 insumos del Inventario que coincidan con lo escrito.
+// Orden: empieza con el texto > lo contiene en el nombre > ingrediente
+// activo > categoría/subcategoría; a igualdad, primero los "En bodega".
+// Con el campo vacío, sugiere los que sí están en bodega.
+function buscarInsumosSugeridos(texto){
+  const q = normTxt(texto);
+  if(!q) return inventario.filter(i => i.estado !== 'Sin stock').slice(0, 8);
+  const puntuar = i => {
+    const n = normTxt(i.nombre);
+    if(n.startsWith(q)) return 0;
+    if(n.includes(q)) return 1;
+    if(normTxt(i.ingredienteActivo).includes(q)) return 2;
+    if(normTxt(i.categoria).includes(q) || normTxt(i.subcategoria).includes(q)) return 3;
+    return -1;
+  };
+  return inventario
+    .map(i => ({ i, p: puntuar(i) }))
+    .filter(x => x.p >= 0)
+    .sort((a, b) =>
+      (a.p - b.p) ||
+      ((a.i.estado === 'Sin stock') - (b.i.estado === 'Sin stock')) ||
+      String(a.i.nombre).localeCompare(String(b.i.nombre), 'es'))
+    .slice(0, 8)
+    .map(x => x.i);
+}
+
 function crearFilaInsumo(fieldId, valores){
   const cont = document.getElementById(fieldId + '_list');
   if(!cont) return;
   const row = document.createElement('div');
   row.className = 'insumo-row';
 
-  const sel = document.createElement('select');
-  sel.className = 'insumo-select';
-  const optDefault = document.createElement('option');
-  optDefault.value = ''; optDefault.textContent = inventario.length ? 'Selecciona insumo…' : 'Sin insumos en Inventario';
-  sel.appendChild(optDefault);
-  inventario.forEach(i => {
-    const opt = document.createElement('option');
-    opt.value = i.nombre; opt.textContent = i.nombre;
-    sel.appendChild(opt);
-  });
-  if(valores && valores.nombre) sel.value = valores.nombre;
+  // Campo de texto con buscador (reemplaza al menú desplegable). Conserva
+  // la clase "insumo-select" para que el guardado de registros siga igual.
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'insumo-select';
+  input.placeholder = 'Buscar o escribir producto…';
+  input.autocomplete = 'off';
+  input.setAttribute('autocapitalize', 'off');
+  input.setAttribute('autocorrect', 'off');
+  input.spellcheck = false;
+  if(valores && valores.nombre) input.value = valores.nombre;
 
   const inputDosis = document.createElement('input');
   inputDosis.type = 'text';
@@ -1144,10 +1187,110 @@ function crearFilaInsumo(fieldId, valores){
   btnQuitar.textContent = '✕';
   btnQuitar.onclick = () => row.remove();
 
-  row.appendChild(sel);
+  const panel = document.createElement('div');
+  panel.className = 'insumo-sugerencias hidden';
+  // Evita que al tocar una sugerencia el campo pierda el foco y se cierre antes del toque.
+  panel.addEventListener('mousedown', e => e.preventDefault());
+
+  function cerrarPanel(){ panel.classList.add('hidden'); panel.innerHTML = ''; }
+
+  function elegir(valor){
+    input.value = valor;
+    cerrarPanel();
+    inputDosis.focus();
+  }
+
+  function mostrarSugerencias(){
+    const texto = input.value.trim();
+    const sugeridos = buscarInsumosSugeridos(texto);
+    const hayExacto = !!texto && inventario.some(i => normTxt(i.nombre) === normTxt(texto));
+    panel.innerHTML = '';
+
+    if(!texto && sugeridos.length === 0){ cerrarPanel(); return; }
+
+    if(texto && sugeridos.length === 0){
+      const sin = document.createElement('div');
+      sin.className = 'insumo-sin-resultados';
+      sin.textContent = 'Sin coincidencias en Inventario';
+      panel.appendChild(sin);
+    }
+
+    sugeridos.forEach(i => {
+      const opt = document.createElement('div');
+      opt.className = 'insumo-opt';
+      const nom = document.createElement('div');
+      nom.className = 'insumo-opt-nombre';
+      nom.textContent = i.nombre;
+      const meta = document.createElement('div');
+      meta.className = 'insumo-opt-meta';
+      const enBodega = i.estado !== 'Sin stock';
+      meta.textContent = i.categoria ? i.categoria + ' · ' : '';
+      const tag = document.createElement('span');
+      tag.textContent = enBodega ? '🟢 en bodega' : '🔴 por comprar';
+      tag.style.color = enBodega ? '#2F8F72' : '#A81F3A';
+      meta.appendChild(tag);
+      opt.appendChild(nom);
+      opt.appendChild(meta);
+      opt.addEventListener('click', () => elegir(i.nombre));
+      panel.appendChild(opt);
+    });
+
+    if(texto && !hayExacto){
+      const libre = document.createElement('div');
+      libre.className = 'insumo-opt insumo-opt-libre';
+      const nom = document.createElement('div');
+      nom.className = 'insumo-opt-nombre';
+      nom.textContent = '✏️ Usar “' + texto + '” tal cual';
+      const meta = document.createElement('div');
+      meta.className = 'insumo-opt-meta';
+      meta.textContent = 'Se agregará a Inventario como “por comprar”';
+      libre.appendChild(nom);
+      libre.appendChild(meta);
+      libre.addEventListener('click', () => elegir(texto));
+      panel.appendChild(libre);
+    }
+
+    panel.classList.remove('hidden');
+  }
+
+  input.addEventListener('input', mostrarSugerencias);
+  input.addEventListener('focus', mostrarSugerencias);
+  input.addEventListener('blur', () => setTimeout(cerrarPanel, 150));
+
+  row.appendChild(input);
   row.appendChild(inputDosis);
   row.appendChild(btnQuitar);
+  row.appendChild(panel);
   cont.appendChild(row);
+}
+
+// Si en un registro se usó un producto que no existe en Inventario (por
+// ejemplo uno que acabas de escribir a mano), lo agrega solito como
+// "Sin stock / por comprar" para que la próxima vez ya aparezca en las
+// sugerencias. Ignora textos muy cortos (para no llenar el inventario de
+// letras sueltas) y no duplica nombres que ya existen.
+function asegurarInsumosEnInventario(camposData){
+  let agregados = 0;
+  Object.keys(camposData || {}).forEach(k => {
+    const v = camposData[k];
+    if(!Array.isArray(v)) return;
+    v.forEach(x => {
+      if(!x || typeof x !== 'object' || typeof x.nombre !== 'string') return;
+      const nombre = x.nombre.trim();
+      if(nombre.length < 3) return;
+      if(inventario.some(i => normTxt(i.nombre) === normTxt(nombre))) return;
+      const insumo = {
+        id: generarId(), creado: Date.now(),
+        nombre, ingredienteActivo:'', categoria:'', tipoProblema:'', subcategoria:'',
+        estado:'Sin stock', evaluacion:'', dosisRecomendada:'',
+        dosisAplicada: x.dosis || '', unidad:'', precio:'', proveedor:''
+      };
+      inventario.unshift(insumo);
+      fsGuardarItem('inventario', insumo);
+      agregados++;
+    });
+  });
+  if(agregados){ pintarInventario(); buscarFitosanitario(); }
 }
 
 function agregarFilaInsumo(fieldId){
@@ -1496,6 +1639,7 @@ function agregarRegistro(){
   }
   if(!bloquearEnvioBreve('registro')) return;
   const camposData = capturarDetallesCampos(tipoTareaSeleccionada);
+  asegurarInsumosEnInventario(camposData);
   const notas = document.getElementById('notas').value;
 
   if(editingIndex !== null){
